@@ -1,0 +1,40 @@
+# Base configuration for flow matching experiments
+defaults:
+  - _self_
+  - experiment: lotka_volterra
+
+# Training parameters
+training:
+  batch_size: 128
+  num_epochs: 10
+  learning_rate: 1e-4
+  ema_decay: 0.99
+  seed: 0
+
+# Model architecture
+model:
+  data_dim: 2
+  covariates_dim: 1
+  hidden_dim: 64
+  time_dim: 4
+  hidden_blocks: 4
+
+# Data parameters
+data:
+  n_samples: 2048
+  sequence_length: 100
+  history_length: 80
+  dt: 0.2
+
+#Inference parameters
+inference:
+  n_samples: 10 
+  nfe: 10
+
+
+# Logging
+logging:
+  wandb:
+    project: "flow-matching-forecasting"
+    log_interval: 1
+  save_model: True

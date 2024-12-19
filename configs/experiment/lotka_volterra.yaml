@@ -1,0 +1,9 @@
+# configs/experiment/lotka_volterra.yaml
+name: lotka_volterra
+
+# Add any experiment-specific parameters here
+simulation:
+  alpha: 1.0  # prey growth rate
+  beta: 0.5   # predation rate
+  delta: 0.5  # predator death rate
+  gamma: 0.5  # predator growth rate: 
