@@ -1,0 +1,3 @@
+# configs/experiment/electricity.yaml
+dataset_name: electricity_nips
+context_ratio: 1

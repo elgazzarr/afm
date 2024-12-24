@@ -38,7 +38,7 @@ class FlowEvaluator:
         dt = 1/self.nfe
 
         predictions = []
-        for _ in tqdm(range(n_prediction_steps)):
+        for _ in range(n_prediction_steps):
             x0 = jrandom.normal(key, shape=(history.shape[-1],))
             x_next = dfx.diffeqsolve(term, solver, 0., 1., dt, x0, args=(history, covariates), saveat=dfx.SaveAt(t1=True)).ys
             predictions.append(x_next) 

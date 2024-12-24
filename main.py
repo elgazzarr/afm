@@ -1,4 +1,5 @@
-import os
+from dotenv import load_dotenv
+load_dotenv()
 import hydra
 import wandb
 from omegaconf import DictConfig, OmegaConf
@@ -11,8 +12,8 @@ from trainers.flow_train import FlowTrainer
 from trainers.flow_eval import FlowEvaluator
 from utils.visualization import Visualizer
 import orbax.checkpoint as ocp
-os.environ['JAX_PLATFORMS'] = 'cpu' 
 import jax
+import os
 import jax.numpy as jnp
 from orbax.checkpoint import PyTreeCheckpointer
 
@@ -24,7 +25,7 @@ def main(config: DictConfig):
 
     wandb_config = OmegaConf.to_container(config, resolve=True)
 
-
+    print("jax devices: ", jax.devices())
     #setup wandb
     wandb.init(project="time_flow", config=wandb_config, name=config.experiment.name)
     
@@ -57,21 +58,21 @@ def main(config: DictConfig):
     trainer = FlowTrainer(config, model, dataloader, rngs_train)
     
     # Train model
-    #trainer.train()
+    trainer.train()
     
     # Evaluate and visualize result`s
     evaluator = FlowEvaluator(model, config.inference.nfe)
     visualizer = Visualizer()
     
     # Generate multiple samples and their predictions
-    num_examples = 5
+    num_examples = 10
     sample_keys = jrandom.split(key, num_examples)  # Split key for each example
     batch_sample = jax.vmap(dataloader.sample)
     histories, covariates, true_futures = batch_sample(sample_keys)
 
     # Generate predictions for each sample
-    eval_keys = jrandom.split(key, num_examples * config.inference.n_samples)
-    eval_keys = eval_keys.reshape((num_examples, config.inference.n_samples, -1))
+    eval_keys = jrandom.split(key, num_examples * config.inference.mcmc_samples)
+    eval_keys = eval_keys.reshape((num_examples, config.inference.mcmc_samples, -1))
 
     batch_predict = jax.vmap(
         lambda k, h, c, tf: jax.vmap(evaluator.predict_trajectory, in_axes=(0, None, None, None))(k, h, c, tf.shape[0])
@@ -85,9 +86,13 @@ def main(config: DictConfig):
             histories[i], 
             predictions[i], 
             true_futures[i], 
-            channel_names=['prey', 'predator']
+            channel_names=['prey', 'predator'],
+            confidence_interval=0.90
         )
         wandb.log({f"Sample {i+1}": wandb.Image(fig)})
+
+    metrics = evaluator.compute_metrics(true_futures, jnp.mean(predictions, axis=1))
+    wandb.log(metrics)
     
     if config.logging.save_model:
         

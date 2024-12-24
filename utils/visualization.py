@@ -38,8 +38,8 @@ class Visualizer:
         # Get number of channels
         n_channels = history.shape[1]
         
-        # Generate colors if channel names not provided
         colors = list(mcolors.TABLEAU_COLORS)[:n_channels]
+        colors_ = list(mcolors.XKCD_COLORS)[:n_channels]
         if channel_names is None:
             channel_names = [f'Channel {i+1}' for i in range(n_channels)]
         
@@ -72,7 +72,8 @@ class Visualizer:
             pred_ts = ts[history_end_idx:pred_end_idx+1]
             pred_line = np.concatenate([history[-1:, i], pred_mean[:, i]])
             ax.plot(pred_ts, pred_line,
-                   color=colors[i],
+                   color=colors_[i],
+                   label="forecast",
                    linewidth=2,
                    linestyle='--',  # Changed to dashed for predictions
                    zorder=3)
@@ -85,7 +86,8 @@ class Visualizer:
                           pred_upper_extended,
                           color=colors[i],
                           alpha=0.2,
-                          zorder=2)
+                          zorder=2,
+                          label=f'{int(confidence_interval*100)}% CI')
             
             # Plot ground truth if available (starting from last history point)
             if true_future is not None:

@@ -1,0 +1,35 @@
+# Base configuration for flow matching experiments
+defaults:
+  - _self_
+  - experiment: electricity
+
+# Training parameters
+training:
+  seed: 0
+  batch_size: 64
+  num_steps: 10000
+  learning_rate: 1e-3
+  val_interval: 200
+
+# Model architecture 
+model:
+  h_dim: 32
+  t_dim: 16
+  n_rnn_layers: 3
+  rnn_hidden: 128
+  n_residual_blocks: 8
+  residual_channels: 8
+  residual_hidden: 64
+
+#Inference parameters
+inference:
+  mcmc_samples: 50 
+  nfe: 30
+
+
+# Logging
+logging:
+  wandb:
+    project: "flow-matching-forecasting"
+    log_interval: 100
+  save_model: false

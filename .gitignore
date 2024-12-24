@@ -20,5 +20,5 @@ Thumbs.db
 .idea/
 *.iml
 wandb/
-
+*.pyc
 outputs/
