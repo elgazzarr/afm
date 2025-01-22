@@ -2,7 +2,6 @@ import gluonts
 from gluonts.dataset.repository import get_dataset, dataset_recipes
 from gluonts.dataset.multivariate_grouper import MultivariateGrouper
 from gluonts.dataset.repository.datasets import dataset_recipes, get_dataset
-from gluonts.dataset.field_names import FieldName
 from gluonts.transform import AddObservedValuesIndicator, InstanceSplitter, ExpectedNumInstanceSampler, TestSplitSampler, ValidationSplitSampler
 from gluonts.dataset.field_names import FieldName
 from gluonts.transform import (
@@ -22,7 +21,7 @@ from gluonts.dataset.loader import TrainDataLoader, InferenceDataLoader, Validat
 from gluonts.itertools import Cached
 from gluonts.dataset.loader import TrainDataLoader
 from gluonts.itertools import Cached
-from typing import List, Optional, Callable, Iterable, Tuple, Iterator
+from typing import List, Optional, Callable, Iterable, Tuple, Iterator, Any
 import jax.numpy as jnp
 from functools import partial
 import numpy as np
@@ -30,73 +29,8 @@ import pandas as pd
 from data.dataloader import GluonTSDataLoaderAdapter
 from gluonts.transform import  SimpleTransformation
 import numpy as np
-
-class StandardScaler(SimpleTransformation):
-    def __init__(
-        self,
-        dim=0,  # dimension 0 for channels in [channels, time]
-        keepdim=True,
-        minimum_scale=1e-10,
-        field_name="target",
-    ):
-        self.dim = dim
-        self.keepdim = keepdim
-        self.minimum_scale = minimum_scale
-        self.field_name = field_name
-        self.mean = None
-        self.std = None
-
-    def fit(self, data_iterator):
-        # First pass: compute means per channel
-        sum_x = None
-        count = 0
-        
-        for data in data_iterator:
-            target = data[self.field_name]  # Shape: [channels, time]
-            # Sum along time dimension (1) to get per-channel statistics
-            if sum_x is None:
-                sum_x = np.sum(target, axis=1, keepdims=self.keepdim)  # [channels, 1]
-            else:
-                sum_x += np.sum(target, axis=1, keepdims=self.keepdim)
-            count += target.shape[1]  # Add number of timesteps
-        
-        self.mean = sum_x / count  # [channels, 1]
-        
-        # Second pass: compute std per channel
-        sum_squared_dev = None
-        for data in data_iterator:
-            target = data[self.field_name]
-            squared_dev = (target - self.mean) ** 2
-            if sum_squared_dev is None:
-                sum_squared_dev = np.sum(squared_dev, axis=1, keepdims=self.keepdim)
-            else:
-                sum_squared_dev += np.sum(squared_dev, axis=1, keepdims=self.keepdim)
-        
-        self.std = np.sqrt(sum_squared_dev / count)
-        self.std = np.maximum(self.std, self.minimum_scale)
-
-    def transform(self, data):
-        target = data[self.field_name]  # [channels, time]
-        scaled_data = (target - self.mean) / self.std
-        data[self.field_name] = scaled_data
-        data['scale'] = self.std  # [channels, 1]
-        data['loc'] = self.mean   # [channels, 1]
-        return data
-    
-    def transform_instance(self, data: jnp.ndarray) -> jnp.ndarray:
-        if self.mean is None or self.std is None:
-            raise ValueError("Scaler must be fitted before transform")            
-        data = jnp.transpose(data)
-        scaled_data = (data - self.mean) / self.std
-        return jnp.transpose(scaled_data)
-    
-    def inverse_transform(self, data: jnp.ndarray) -> jnp.ndarray:
-        if self.mean is None or self.std is None:
-            raise ValueError("Scaler must be fitted before inverse transform")            
-        data = jnp.transpose(data)
-        original_scale_data = (data * self.std) + self.mean
-        return jnp.transpose(original_scale_data)
-
+from gluonts.dataset import DataBatch, Dataset
+from data.scalers import StandardScaler, NothingScaler
 
 def _to_dataframe(input_label: Tuple[DataEntry, DataEntry]) -> pd.DataFrame:
     """
@@ -164,7 +98,7 @@ def add_temporal_covariates(dataset: Iterable[dict]) -> Iterable[dict]:
     return dataset
 
 
-def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int) -> Tuple[GluonTSDataLoaderAdapter, GluonTSDataLoaderAdapter, InferenceDataLoader, dict, SimpleTransformation]:
+def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int, scale=False) -> Tuple[GluonTSDataLoaderAdapter, GluonTSDataLoaderAdapter, Any, dict, SimpleTransformation]:
 
     dataset = get_dataset(dataset_name, regenerate=False)
     prediction_length = dataset.metadata.prediction_length
@@ -185,7 +119,7 @@ def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int) -
     VAL_START = TOTAL_LEN - prediction_length - context_length
     VAL_SIZE = TOTAL_LEN - VAL_START
 
-    scaler = StandardScaler(field_name=FieldName.TARGET)
+    scaler = StandardScaler(field_name=FieldName.TARGET) if scale else NothingScaler()
     scaler.fit(dataset_train)
     
     train_transform = Chain([
@@ -223,17 +157,6 @@ def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int) -
         future_length=prediction_length,
         time_series_fields=[FieldName.OBSERVED_VALUES, FieldName.FEAT_TIME])
         ])
-    
-    test_transform = InstanceSplitter(
-        target_field=FieldName.TARGET,
-        is_pad_field=FieldName.IS_PAD,
-        start_field=FieldName.START,
-        forecast_start_field=FieldName.FORECAST_START,
-        instance_sampler=TestSplitSampler(),
-        past_length=context_length,
-        future_length=prediction_length,
-        time_series_fields=[FieldName.FEAT_TIME],
-    )  
 
     train_data_loader = GluonTSDataLoaderAdapter(TrainDataLoader(
         dataset = Cached(dataset_train),
@@ -249,15 +172,19 @@ def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int) -
         stack_fn = batchify
     ))
 
-    test_data_loader = InferenceDataLoader(
-        dataset = Cached(dataset_test),
-        batch_size = batch_size,
-        transform = test_transform +  SelectFields(input_names + required_fields, allow_missing=True),
-        stack_fn = batchify
-    )
 
-    context, covariates, target = next(iter(train_data_loader))
+    # Preparing test_loader
 
+    window_length = prediction_length 
+    _, test_template = split(dataset_test, offset=-window_length)
+    test_data = test_template.generate_instances(window_length)
+
+
+    gt_it = map(_to_dataframe, test_data),
+
+    context, covariates, _ = next(iter(train_data_loader))
+    
     dims = {"data_dim": context.shape[-1], "cov_dim": covariates.shape[-1]}
     
-    return train_data_loader, val_data_loader, test_data_loader, dims, scaler
+
+    return train_data_loader, val_data_loader, test_data, dims, scaler

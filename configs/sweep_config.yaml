@@ -1,0 +1,32 @@
+program: /home/artiintel/ahmelg/.conda/envs/gm/bin/python
+command:
+  - ${program}
+  - main_hpsearch.py
+  - ${args}
+method: bayes
+metric:
+  name: CRPS
+  goal: minimize
+parameters:
+  experiment.context_ratio:
+    values: [1, 2, 3]
+  training.batch_size:
+    values: [32, 64, 128]
+  training.learning_rate:
+    distribution: log_uniform_values
+    min: 1e-4
+    max: 1e-2
+  model.h_dim:
+    values: [32, 64, 128]
+  model.t_dim:
+    values: [16, 32, 64]
+  model.n_rnn_layers:
+    values: [1, 2, 3]
+  model.rnn_hidden:
+    values: [32, 64, 128]
+  model.n_residual_blocks:
+    values: [4, 8, 12]
+  model.residual_channels:
+    values: [8, 16, 32]
+  model.residual_hidden:
+    values: [32, 64, 128]
