@@ -62,7 +62,7 @@ class FlowEvaluator:
             return self.model(x, history, covariates, t)
         
         term = ODETerm(vf)
-        solver = Tsit5()
+        solver = Euler()
         dt = 1/self.nfe
         predictions = []
         current_history = history

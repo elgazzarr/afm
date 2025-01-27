@@ -11,6 +11,9 @@ import jax.random as jrandom
 from matplotlib import pyplot as plt
 from data.scalers import ContextScaler
 from copy import deepcopy
+import diffrax as dfx
+from diffrax import ODETerm, Tsit5, Euler
+
 
 class FlowTrainer:
     def __init__(self, 
@@ -30,7 +33,20 @@ class FlowTrainer:
         
     
     def p0(self, key, shape):
-        return jax.random.normal(key, shape) + 1.0
+        return jax.random.normal(key, shape)
+    
+    def p1(self, key: jrandom.PRNGKey, context: jnp.ndarray, covariates: jnp.ndarray) -> jnp.ndarray:
+
+        def vf(t, x, args):
+            history, covariates = args
+            return self.model(x, history, covariates, t)
+        
+        term = ODETerm(vf)
+        solver = Euler()
+        dt = 1/50
+        x0 = jrandom.normal(key, shape=(context.shape[-1],))
+        x_next = dfx.diffeqsolve(term, solver, 0., 1., dt, x0, args=(context, covariates), saveat=dfx.SaveAt(t1=True)).ys
+        return x_next
     
     def loss_fn(self,
     model: nnx.Module,

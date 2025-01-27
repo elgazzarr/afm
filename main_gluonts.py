@@ -7,6 +7,7 @@ import jax.random as jrandom
 import flax.nnx as nnx
 from models.flow import Flow
 from trainers.flow_train import FlowTrainer
+from trainers.flow_train_stf import FlowTrainerSTF
 from trainers.eval_gluonts import JaxPredictor
 from utils.visualization import Visualizer
 import orbax.checkpoint as ocp
@@ -25,7 +26,6 @@ def parse_args():
                       help='Name of the dataset')
     parser.add_argument('--context_ratio', type=float, default=2.0,
                       help='Context ratio for dataset')
-    
     # Training parameters
     parser.add_argument('--seed', type=int, default=1,
                       help='Random seed')
@@ -39,6 +39,7 @@ def parse_args():
                       help='Validation interval')
     parser.add_argument('--patience', type=int, default=15,
                       help='Patience for early stopping')
+    parser.add_argument('--student_forcing', type=bool, default=True,)
     
     # Model architecture
     parser.add_argument('--h_dim', type=int, default=64,
@@ -77,7 +78,7 @@ def main():
     args = parse_args()
     
     # Initialize wandb
-    wandb.init(project=args.wandb_project, config=vars(args), name=args.dataset_name)
+    wandb.init(project=args.wandb_project, config=vars(args), group=args.dataset_name)
     config = wandb.config
     
     #print("jax devices: ", jax.devices())
@@ -113,8 +114,12 @@ def main():
     )
     
     # Initialize trainer
-    print("Initializing trainer")
-    trainer = FlowTrainer(config, model, train_loader, val_loader, rngs_train)
+    if config.student_forcing:
+        print("Initializing student forcing trainer")
+        trainer = FlowTrainerSTF(config, model, train_loader, val_loader, rngs_train)
+    else:
+        print("Initializing trainer")
+        trainer = FlowTrainer(config, model, train_loader, val_loader, rngs_train)
     
     # Train model
     print("Training model")
