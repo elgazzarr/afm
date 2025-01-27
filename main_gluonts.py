@@ -39,7 +39,7 @@ def parse_args():
                       help='Validation interval')
     parser.add_argument('--patience', type=int, default=15,
                       help='Patience for early stopping')
-    parser.add_argument('--student_forcing', type=bool, default=True,)
+    parser.add_argument('--student_forcing', type=bool, default=False,)
     
     # Model architecture
     parser.add_argument('--h_dim', type=int, default=64,

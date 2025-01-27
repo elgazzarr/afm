@@ -14,7 +14,7 @@ from copy import deepcopy
 import diffrax as dfx
 from diffrax import ODETerm, Tsit5, Euler
 
-
+# Trainer that uses a student-teacher forcing approach to train an autoregressive flow model
 class FlowTrainerSTF:
     def __init__(self, 
                  config: Dict[str, Any],
@@ -43,7 +43,7 @@ class FlowTrainerSTF:
         
         term = ODETerm(vf)
         solver = Euler()
-        dt = 1/5
+        dt = 1/2
         x0 = jrandom.normal(key, shape=(context.shape[0], context.shape[-1])) 
         x_next = dfx.diffeqsolve(term, solver, 0., 1., dt, x0, args=(context, covariates), saveat=dfx.SaveAt(t1=True)).ys[-1]
         return x_next
@@ -122,12 +122,11 @@ class FlowTrainerSTF:
         return val_loss
      
 
-    
     def train(self):
         best_val_loss = float('inf')
         patience_counter = 0  # Track validation checks without improvement
         patience = self.config.patience
-        scheduler = TeacherForcingScheduler( start_ratio=0.9,
+        scheduler = TeacherForcingScheduler(start_ratio=0.9,
                                             end_ratio=0.1,
                                             total_steps=self.config.training_steps)
 
