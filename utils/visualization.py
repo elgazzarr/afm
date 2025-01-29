@@ -129,3 +129,75 @@ class Visualizer:
         
         return fig
     
+
+    @staticmethod
+    def plot_reconstruction(
+        ts: np.ndarray,
+        original: np.ndarray,
+        reconstructed: np.ndarray,
+        title: str = "Reconstruction",
+        channel_names: Optional[List[str]] = None
+    ) -> Figure:
+        """
+        Plot the original and reconstructed time series data with uncertainty bounds.
+
+        Args:
+            ts: Time points
+            original: Original time series data with shape (T, C)
+            reconstructed: Reconstructed mean with shape (T, C)
+            title: Plot title
+            channel_names: Optional list of channel names
+
+        Returns:
+            matplotlib.figure.Figure: The figure object containing the plot
+        """
+        fig = plt.figure(figsize=(12, 6))
+        ax = plt.gca()
+        
+        # Get number of channels
+        n_channels = original.shape[1]
+        
+        # Set up colors and channel names
+        colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+        if channel_names is None:
+            channel_names = [f'Channel {i+1}' for i in range(n_channels)]
+            
+
+        
+        for i in range(n_channels):
+            # Plot original data
+            ax.plot(ts, original[:, i],
+                   color=colors[i],
+                   label=f'{channel_names[i]} (Original)',
+                   linewidth=2,
+                   zorder=3)
+            
+            # Plot reconstructed mean
+            ax.plot(ts, reconstructed[:, i],
+                   color=colors[i],
+                   label=f'{channel_names[i]} (Reconstructed)',
+                   linewidth=2,
+                   linestyle='--',
+                   zorder=3)
+            
+        
+        # Customize appearance
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('#666666')
+        ax.spines['bottom'].set_color('#666666')
+        
+        # Add labels
+        ax.set_xlabel('Time', color='#666666')
+        ax.set_ylabel('Value', color='#666666')
+        ax.set_title(title, pad=20)
+        
+        # Customize legend
+        legend = ax.legend(bbox_to_anchor=(1.02, 1),
+                         loc='upper left',
+                         frameon=False)
+        
+        # Adjust layout to prevent legend cutoff
+        plt.subplots_adjust(right=0.85)
+        
+        return fig

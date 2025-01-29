@@ -50,7 +50,7 @@ class FlowEvaluator:
 
     def predict_trajectory_fixed_context(self,
     key: jrandom.PRNGKey,
-    history: jnp.ndarray,  # (time, features)
+    history: jnp.ndarray, 
     covariates: jnp.ndarray,
     n_prediction_steps: int,
     context_length: int
@@ -66,14 +66,14 @@ class FlowEvaluator:
         dt = 1/self.nfe
         predictions = []
         current_history = history
-        
         context_scaler = ContextScaler()
 
         for _ in range(n_prediction_steps):
             context = current_history[-context_length:]
             context, scale = context_scaler.fit_transform(context)
-            x0 = jrandom.normal(key, shape=(history.shape[-1],)) + 1.0
-            x_next = dfx.diffeqsolve(term, solver, 0., 1., dt, x0, args=(context, covariates), saveat=dfx.SaveAt(t1=True)).ys
+            z0 = self.model.p0(key, shape=(self.model.latent_dim))
+            z_next = dfx.diffeqsolve(term, solver, 0., 1., dt, z0, args=(context, covariates), saveat=dfx.SaveAt(t1=True)).ys
+            x_next = self.model.decode(z_next)
             x_next = context_scaler.inverse_transform(x_next, scale)
             predictions.append(x_next)
             current_history = jnp.concatenate([current_history, x_next], axis=0)

@@ -5,7 +5,7 @@ import wandb
 from omegaconf import DictConfig, OmegaConf
 import jax.random as jrandom
 import flax.nnx as nnx
-from models.flow import Flow
+from models.latentflow import LatentFlow
 from trainers.flow_train import FlowTrainer
 from trainers.flow_train_stf import FlowTrainerSTF
 from trainers.eval_gluonts import JaxPredictor
@@ -29,7 +29,7 @@ def parse_args():
     # Training parameters
     parser.add_argument('--seed', type=int, default=1,
                       help='Random seed')
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=64,
                       help='Batch size')
     parser.add_argument('--training_steps', type=int, default=10000,
                       help='Number of training steps')
@@ -42,6 +42,7 @@ def parse_args():
     parser.add_argument('--student_forcing', type=bool, default=False,)
     
     # Model architecture
+    parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--h_dim', type=int, default=64,
                       help='Hidden dimension')
     parser.add_argument('--t_dim', type=int, default=32,
@@ -94,13 +95,15 @@ def main():
     train_loader, val_loader, test_data, dims, scaler = get_dataset_loader(
         config.dataset_name, 
         config.batch_size, 
-        config.context_ratio
+        config.context_ratio,
+        scale=False
     )
     
     # Initialize model
     print("Initializing model...")
-    model = Flow(
+    model = LatentFlow(
         dim_x=dims["data_dim"],
+        dim_z=config.z_dim,
         dim_c=dims["cov_dim"],
         dim_h=config.h_dim,
         dim_t=config.t_dim,
