@@ -15,121 +15,75 @@ import diffrax as dfx
 from diffrax import ODETerm, Tsit5, Euler
 
 
-def normal_ll(predictions: jnp.ndarray, mu: jnp.ndarray, sd: jnp.ndarray) -> jnp.ndarray:
-    """
-    Compute Gaussian log-likelihood loss for time series data.
-    
-    Args:
-        predictions: Ground truth data of shape (N, T, C)
-        mu: Predicted means of shape (N, T, C)
-        sd: Standard deviations of shape (N, T, C)
-    
-    Returns:
-        Negative log-likelihood loss (scalar)
-    """
-    point_nlls = (
-        0.5 * jnp.log(2 * jnp.pi) +  
-        jnp.log(sd) +                
-        0.5 * jnp.square((predictions - mu) / sd)
-    )
-    
-    return jnp.mean(point_nlls)
-
 class FlowTrainer:
     def __init__(self, 
                  config: Dict[str, Any],
-                 model: nnx.Module,
+                 flow_model: nnx.Module,
+                 autoencoder: nnx.Module,
                  train_loader: Any,
                  val_loader: Any,
                  rngs: nnx.Rngs):
+        
         self.config = config
-        self.model = model
+        self.flow_model = flow_model
+        self.autoencoder = autoencoder
         self.best_model = None
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.rngs = rngs 
-        self.optimizer = nnx.Optimizer(model, optax.adam(config.learning_rate))
+        self.optimizer = nnx.Optimizer(self.flow_model, optax.adam(config.learning_rate))
         self.visualizer = Visualizer()
         self.lambda_scheduler = optax.linear_schedule(0.0, 1.0, config.training_steps // 2)
     
-    
     def loss_fn(
-        self,
-        model: nnx.Module,
-        history: jnp.ndarray,
-        covariates: jnp.ndarray,
-        future: jnp.ndarray,
-        step: int,
-        rngs: nnx.Rngs
+    self,
+    flow_model: nnx.Module,
+    history: jnp.ndarray, 
+    covariates: jnp.ndarray,
+    future: jnp.ndarray,  
+    step: int,
+    rngs: nnx.Rngs
     ) -> float:
-        # Initial scaling and encoding (once per batch)
+        # 1. Compute scale ONCE using context window
         context_scaler = ContextScaler()
-        x_past_scaled, scale = jax.vmap(context_scaler.fit_transform)(history)
-        x_future_scaled = jax.vmap(context_scaler.transform)(future, scale)
-        
-        # Encode once outside loop
-        z_past_init = jax.vmap(model.encode)(x_past_scaled, covariates[:, :history.shape[1]])
-        z_future = jax.vmap(model.encode)(x_future_scaled, covariates[:, history.shape[1]:])
-        
-        batch_size, window_size = history.shape[:2]
-        future_steps = future.shape[1]
+        scaled_history, scale = jax.vmap(context_scaler.fit_transform)(history)
+        scaled_future = jax.vmap(context_scaler.transform)(future, scale)  # (batch, pred_len, dim)
 
-        # Initial carry for scan
+        # 2. Initialize with scaled history
+        window_size = scaled_history.shape[1]
         init_carry = {
-            'z_past': z_past_init,
-            'cum_flow_loss': 0.0,
+            'x_past': scaled_history,
+            'loss': 0.0,
             'rng': rngs(),
         }
 
         def scan_step(carry, i):
-            z_past = carry['z_past']
+            x_past = carry['x_past']
             rng = carry['rng']
-            
-            # Split RNGs for this step
             rng, t_rng, flow_rng = jax.random.split(rng, 3)
             
-            # Get current context and target
-            h = jax.vmap(model.get_context)(z_past)  # No covariates needed
-            z_next = z_future[:, i]
-            z_next_target = jax.lax.stop_gradient(z_future[:, i])
-            c_t = covariates[:, history.shape[1] + i]
-
-            # Flow matching computation
-            t = jax.random.uniform(t_rng, (batch_size,))
-            z0 = self.model.p0(flow_rng, (batch_size, model.latent_dim))
-            z_mid = (1 - t[:, None])*z0 + t[:, None]*z_next_target
+            # 3. Use pre-scaled future values directly
+            x_next = scaled_future[:, i]  # Already scaled
             
-            pred_flow = jax.vmap(model.predict)(z_mid, h, c_t, t)
-            flow_loss = jnp.mean(jnp.square(pred_flow - (z_next_target - z0)))
-
-            # Update context window
-            new_z_past = jnp.concatenate([z_past, z_next[:, None]], axis=1)
-            new_z_past = new_z_past[:, -window_size:]
-
-            # Weight and accumulate loss
-            lambda_ = self.lambda_scheduler(step)
+            t = jax.random.uniform(t_rng, (x_next.shape[0],), minval=0.0, maxval=1.0)
+            x0 = flow_model.p0(flow_rng, x_next.shape)
+            #x0 = flow_model.p0.sample(flow_rng, x_past[:, -1])
+            xt = (1 - t[:, None])*x0 + t[:, None]*x_next
+            pred_flow = jax.vmap(flow_model)(xt, x_past, covariates, t)
+            optimal_flow = x_next - x0
+            flow_loss = jnp.mean(jnp.square(pred_flow - optimal_flow))            
+            # 4. Update with SCALED values
+            new_x_past = jnp.concatenate([x_past, x_next[:, None]], axis=1)[:, -window_size:]
+            
             return {
-                'z_past': new_z_past,
-                'cum_flow_loss': carry['cum_flow_loss'] + lambda_*flow_loss,
+                'x_past': new_x_past,
+                'loss': carry['loss'] + flow_loss,
                 'rng': rng
             }, None
 
-        # Run scan over all future steps
-        final_carry, _ = jax.lax.scan(
-            scan_step,
-            init_carry,
-            jnp.arange(future_steps)
-        )
-
-        # Compute reconstruction loss ONCE at the end
-        x_recon = jax.vmap(model.decode)(jnp.concatenate([z_past_init, z_future], axis=1))
-
-        pred_loss = optax.losses.squared_error(x_recon, jnp.concatenate([x_past_scaled, x_future_scaled], axis=1)).mean()
-        
-        # Combine losses
-        total_loss = final_carry['cum_flow_loss'] + (1 - self.lambda_scheduler(step)) * pred_loss
-        
-        return (total_loss, final_carry['cum_flow_loss'], pred_loss)
+        final_carry, _ = jax.lax.scan(scan_step, init_carry, jnp.arange(future.shape[1]))
+        return final_carry['loss']
+    
 
     @nnx.jit(static_argnums=(0,))
     def train_step(self,
@@ -140,100 +94,89 @@ class FlowTrainer:
                   prediction: jnp.ndarray,
                   step: int,
                   rngs: nnx.Rngs) -> float:
-        loss, grads = nnx.value_and_grad(self.loss_fn)(
-            model, history, covariates, prediction,step, rngs
-        )
+        
+        loss, grads = nnx.value_and_grad(self.loss_fn)(model, history, covariates, prediction, step, rngs)
         optimizer.update(grads)
         return loss
     
     def evaluate(self, model, step, plot, n_plots=5):
-        keys = jrandom.split(self.rngs(), self.config.mcmc_samples)
-        evaluator = FlowEvaluator(model, nfe=self.config.nfe)
-        val_loss = 0.0
-        for i, (history, covariates, true) in enumerate(self.val_loader):
-            val_loss = self.loss_fn(model, history, covariates, true, step, self.rngs)
-            predictions = jax.vmap(jax.vmap(evaluator.predict_trajectory_fixed_context, in_axes=(0,None,None,None, None)),in_axes=(None,0,0,None, None))(keys, history, covariates, true.shape[1], history.shape[1])
-        val_loss = val_loss / (i + 1)
-        wandb.log({'val_loss': val_loss})
+        val_losses = []
+        
+        for i, (x_history, covariates, x_future) in enumerate(self.val_loader):
+            z_history = self.autoencoder.encode(x_history)
+            z_future = self.autoencoder.encode(x_future)
+            val_loss = self.loss_fn(model, z_history, covariates, z_future, step, self.rngs)
+            val_losses.append(val_loss)
+
         if plot:
             ts = jnp.arange(covariates.shape[1])
-            history_scaled = model.scaler.inverse_transform(history[0])
-            true_scaled = model.scaler.inverse_transform(true[0])
-            predictions_scaled = jax.vmap(model.scaler.inverse_transform)(predictions[0])
+            z_predictions = model.sample_flow(z_history, covariates, z_future.shape[1], self.config.nfe, self.config.mcmc_samples, self.rngs())
+            x_predictions = jax.vmap(self.autoencoder.decode)(z_predictions)
             for i in range(n_plots):
                 fig = self.visualizer.plot_trajectories(
                     ts,
-                    history_scaled[:, i:i+1],
-                    predictions_scaled[:, :, i:i+1],
-                    true_scaled[:, i:i+1],
+                    z_history[0, :, i:i+1],
+                    z_predictions[:, 0, :, i:i+1],
+                    z_future[0, :, i:i+1],
                     channel_names=['data'],
                     confidence_interval=0.90
                 )
-                wandb.log({f"Sample": wandb.Image(plt)})
+                wandb.log({f"Latent Forecast": wandb.Image(plt)})
                 plt.close(fig)
-            
-            context_scaler = ContextScaler()
-            history_, scale = context_scaler.fit_transform(history_scaled)
-            true_ = context_scaler.transform(true_scaled, scale)
-            x_true = jnp.concatenate([history_, true_], axis=1)
-            z = model.encode(x_true, covariates[0])
-            x_recon = jax.vmap(model.decode)(z)
-            x_recon = context_scaler.inverse_transform(model.scaler.inverse_transform(x_recon), scale)
-            for i in range(n_plots):
-                fig = self.visualizer.plot_reconstruction(
+
+                fig = self.visualizer.plot_trajectories(
                     ts,
-                    x_true[:, i:i+1],
-                    x_recon[:, i:i+1],
-                    channel_names=['data']
+                    x_history[0, :, i:i+1],
+                    x_predictions[:, 0, :, i:i+1],
+                    x_future[0, :, i:i+1],
+                    channel_names=['data'],
+                    confidence_interval=0.90
                 )
-                wandb.log({f"Reconstruction": wandb.Image(plt)})
+                wandb.log({f"Data Forecast": wandb.Image(plt)})
+                plt.close(fig)
         
-        return val_loss
+        return float(jnp.mean(jnp.array(val_losses)))
      
 
     
     def train(self):
+
         best_val_loss = float('inf')
-        patience_counter = 0  # Track validation checks without improvement
-        patience = self.config.patience
-        
+        patience_counter = 0 
+
         for step in tqdm(range(self.config.training_steps)):
-            history, covariates, prediction = next(iter(self.train_loader))
-            loss, flow_loss, recon_loss = self.train_step(
-                self.model,
+            x_history, covariates, x_prediction = next(iter(self.train_loader))
+            z_history = self.autoencoder.encode(x_history)
+            z_prediction = self.autoencoder.encode(x_prediction)
+
+            loss = self.train_step(
+                self.flow_model,
                 self.optimizer,
-                history,
+                z_history,
                 covariates,
-                prediction,
+                z_prediction,
                 step,
                 self.rngs
             )
             
             if step % self.config.log_interval == 0:
-                metrics = {'loss': round(loss, 4)}
-                wandb.log(metrics, step=step)
-                metrics = {'flow_loss': round(flow_loss, 4)}
-                wandb.log(metrics, step=step)
-                metrics = {'recon_loss': round(recon_loss, 4)}
-                wandb.log(metrics, step=step)
-                
-            if step % self.config.val_interval == 0:
-                val_loss,_,_ = self.evaluate(self.model, step, plot=True)
-                
+                val_loss = self.evaluate(self.flow_model, step, plot=True)
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
-                    self.best_model = deepcopy(self.model)
-                    patience_counter = 0  # Reset patience counter
-                    wandb.log({'best_val_loss': best_val_loss})
+                    self.best_model = deepcopy(self.flow_model)
+                    patience_counter = 0 
                 else:
                     patience_counter += 1
                     
-                # Log patience counter for monitoring
-                wandb.log({'patience_counter': patience_counter})
+                metrics = {'fm/train_loss': round(loss, 4),
+                            'fm/val_loss': round(val_loss, 4),
+                            'fm/best_val_loss': round(best_val_loss, 4),
+                            'fm/patience_counter': patience_counter}
                 
-                # Check if we should stop training
-                if patience_counter >= patience:
+                if patience_counter >= self.config.patience:
                     print(f'\nEarly stopping triggered after {step} steps. Best val_loss: {best_val_loss}')
-                    break
+                    return self.best_model
+            
+                wandb.log(metrics)
                     
         return self.best_model

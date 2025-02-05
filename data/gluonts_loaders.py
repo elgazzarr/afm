@@ -121,10 +121,10 @@ def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int, s
 
     scaler = StandardScaler(field_name=FieldName.TARGET) if scale else NothingScaler()
     scaler.fit(dataset_train)
+    dataset_train = [scaler.transform(entry.copy()) for entry in dataset_train]
+    #dataset_test = [scaler.transform(entry.copy()) for entry in dataset_test]
     
     train_transform = Chain([
-        scaler
-        ,
         AddObservedValuesIndicator(
         target_field=FieldName.TARGET,
         output_field=FieldName.OBSERVED_VALUES,)
@@ -141,8 +141,6 @@ def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int, s
         ])
     
     val_transform = Chain([
-        scaler
-        ,
         AddObservedValuesIndicator(
         target_field=FieldName.TARGET,
         output_field=FieldName.OBSERVED_VALUES,)
@@ -158,19 +156,23 @@ def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int, s
         time_series_fields=[FieldName.OBSERVED_VALUES, FieldName.FEAT_TIME])
         ])
 
-    train_data_loader = GluonTSDataLoaderAdapter(TrainDataLoader(
-        dataset = Cached(dataset_train),
-        batch_size = batch_size,
-        transform = train_transform,
-        stack_fn = batchify)
+    train_data_loader = GluonTSDataLoaderAdapter(
+        TrainDataLoader(
+            dataset=Cached(dataset_train),
+            batch_size=batch_size,
+            transform=train_transform,
+            stack_fn=batchify
+        )
     )
 
-    val_data_loader = GluonTSDataLoaderAdapter(InferenceDataLoader(
-        dataset = Cached(dataset_train),
-        batch_size = 1,
-        transform = val_transform,
-        stack_fn = batchify
-    ))
+    val_data_loader = GluonTSDataLoaderAdapter(
+        InferenceDataLoader(
+            dataset=Cached(dataset_train),
+            batch_size=1,
+            transform=val_transform,
+            stack_fn=batchify
+        )
+    )
 
 
     # Preparing test_loader

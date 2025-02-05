@@ -23,63 +23,102 @@ class FlowEvaluator:
         self.model = model
         self.nfe = nfe
         
-    def predict_trajectory(self, 
-                         key: jrandom.PRNGKey,
-                         history: jnp.ndarray,
-                         covariates: jnp.ndarray,
-                         n_prediction_steps: int
-                         ) -> jnp.ndarray:
-        """Generate trajectory prediction via unrolling."""
+    def sample_flow(model, history, covariates, n_steps_pred, n_steps_flow, n_samples, key):
         
-        def vf(t, x, args):
-            history, covariates = args
-            return self.model(x, history, covariates, t)
-        
-        term = ODETerm(vf)
-        solver = Tsit5()
-        dt = 1/self.nfe
+        def predict(key, history, covariates, n_steps_flow, n_steps_pred):
+            def vf(t, x, args):
+                history, covariates = args
+                return model(x, history, covariates, t)
+                
+            term = ODETerm(vf)
+            solver = dfx.Euler()
+            dt = 1/n_steps_flow
+            predictions = []
+            current_history = history
+            context_length = history.shape[0]
+            context_scaler = ContextScaler()
+            for _ in range(n_steps_pred):
+                context = current_history[-context_length:]
+                context, scale = context_scaler.fit_transform(context)
+                x0 = model.p0(key, shape=(history.shape[-1],))
+                x_next = dfx.diffeqsolve(
+                    term, solver, 0., 1., dt, x0, 
+                    args=(context, covariates), 
+                    saveat=dfx.SaveAt(t1=True)
+                ).ys
+                x_next = context_scaler.inverse_transform(x_next, scale)
+                predictions.append(x_next)
+                current_history = jnp.concatenate([current_history, x_next], axis=0)
+                
+            predictions = jnp.vstack(predictions)
+            return predictions
 
-        predictions = []
-        for _ in range(n_prediction_steps):
-            x0 = jrandom.normal(key, shape=(history.shape[-1],))
-            x_next = dfx.diffeqsolve(term, solver, 0., 1., dt, x0, args=(history, covariates), saveat=dfx.SaveAt(t1=True)).ys
-            predictions.append(x_next) 
-            history = jnp.concatenate([history, x_next], axis=0)
-        return jnp.vstack(predictions)
+        key_samples = jrandom.split(key, n_samples)
+        
+        # First vmap over batch, then over samples
+        vmapped_predict = jax.vmap(predict, in_axes=(None, 0, 0, None, None))  # vmap over batch
+        vmapped_predict = jax.vmap(vmapped_predict, in_axes=(0, None, None, None, None))  # vmap over samples
+        
+        pred_samples = vmapped_predict(key_samples, history, covariates, n_steps_flow, n_steps_pred)
+        return pred_samples
     
 
-    def predict_trajectory_fixed_context(self,
-    key: jrandom.PRNGKey,
-    history: jnp.ndarray, 
-    covariates: jnp.ndarray,
-    n_prediction_steps: int,
-    context_length: int
+    def predict_trajectory_fixed_context(
+        self,
+        key: jrandom.PRNGKey,
+        history: jnp.ndarray, 
+        covariates: jnp.ndarray,
+        n_prediction_steps: int,
+        context_length: int
     ) -> jnp.ndarray:
         
-        
         def vf(t, x, args):
-            history, covariates = args
-            return self.model(x, history, covariates, t)
+            context, covariates = args
+            return self.model(x, context, covariates, t)
         
         term = ODETerm(vf)
         solver = Euler()
         dt = 1/self.nfe
-        predictions = []
-        current_history = history
-        context_scaler = ContextScaler()
+        #context_scaler = ContextScaler()
 
-        for _ in range(n_prediction_steps):
+        def scan_step(carry, _):
+            current_history, rng = carry
+            
+            # Split RNGs
+            rng, sample_key = jax.random.split(rng)
+            
+            # Get context from last context_length steps
             context = current_history[-context_length:]
-            context, scale = context_scaler.fit_transform(context)
-            z0 = self.model.p0(key, shape=(self.model.latent_dim))
-            z_next = dfx.diffeqsolve(term, solver, 0., 1., dt, z0, args=(context, covariates), saveat=dfx.SaveAt(t1=True)).ys
-            x_next = self.model.decode(z_next)
-            x_next = context_scaler.inverse_transform(x_next, scale)
-            predictions.append(x_next)
-            current_history = jnp.concatenate([current_history, x_next], axis=0)
+            #context_scaled, scale = context_scaler.fit_transform(context)
+            
+            # Generate latent trajectory
+            z0 = self.model.p0(sample_key, shape=(context.shape[-1],))
+            z_next = dfx.diffeqsolve(
+                term, solver, 0., 1., dt, z0,
+                args=(context, covariates),
+                saveat=dfx.SaveAt(t1=True)
+            ).ys
+            
+            #z_next = context_scaler.inverse_transform(z_next, scale)
+            
+            # Update history
+            new_history = jnp.concatenate([current_history, z_next], axis=0)
+            current_history = new_history[-context_length:]
+            return (current_history, rng), z_next
+
+        # Initial carry with history and RNG
+        init_carry = (history, key)
         
-        predictions = jnp.vstack(predictions)
-        return predictions
+        # Run scan for n_prediction_steps
+        (final_history, _), predictions = jax.lax.scan(
+            scan_step,
+            init_carry,
+            xs=None,
+            length=n_prediction_steps
+        )
+
+
+        return jnp.squeeze(predictions, axis=1)
     
 
     def compute_metrics(self, 

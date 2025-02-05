@@ -5,9 +5,10 @@ import wandb
 from omegaconf import DictConfig, OmegaConf
 import jax.random as jrandom
 import flax.nnx as nnx
-from models.latentflow import LatentFlow
+from models.flow import Flow
+from models.autoencoders import CausalVAE, IdentityVAE
 from trainers.flow_train import FlowTrainer
-from trainers.flow_train_stf import FlowTrainerSTF
+from trainers.ae_train import AutoEncoderTrainer
 from trainers.eval_gluonts import JaxPredictor
 from utils.visualization import Visualizer
 import orbax.checkpoint as ocp
@@ -22,28 +23,25 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Flow Matching for Time Series')
     
     # Dataset parameters
-    parser.add_argument('--dataset_name', type=str, default='electricity_nips',
+    parser.add_argument('--dataset_name', type=str, default='solar_nips',
                       help='Name of the dataset')
-    parser.add_argument('--context_ratio', type=float, default=2.0,
+    parser.add_argument('--context_ratio', type=float, default=3.0,
                       help='Context ratio for dataset')
     # Training parameters
     parser.add_argument('--seed', type=int, default=1,
                       help='Random seed')
-    parser.add_argument('--batch_size', type=int, default=64,
+    parser.add_argument('--batch_size', type=int, default=128,
                       help='Batch size')
-    parser.add_argument('--training_steps', type=int, default=10000,
+    parser.add_argument('--training_steps', type=int, default=5000,
                       help='Number of training steps')
     parser.add_argument('--learning_rate', type=float, default=1e-3,
                       help='Learning rate')
-    parser.add_argument('--val_interval', type=int, default=500,
-                      help='Validation interval')
-    parser.add_argument('--patience', type=int, default=15,
+    parser.add_argument('--patience', type=int, default=10,
                       help='Patience for early stopping')
-    parser.add_argument('--student_forcing', type=bool, default=False,)
     
     # Model architecture
-    parser.add_argument('--z_dim', type=int, default=128)
-    parser.add_argument('--h_dim', type=int, default=64,
+    parser.add_argument('--z_dim', type=int, default=256)
+    parser.add_argument('--h_dim', type=int, default=128,
                       help='Hidden dimension')
     parser.add_argument('--t_dim', type=int, default=32,
                       help='Time dimension')
@@ -67,7 +65,7 @@ def parse_args():
     # Logging parameters
     parser.add_argument('--wandb_project', type=str, default='flowtime',
                       help='W&B project name')
-    parser.add_argument('--log_interval', type=int, default=500,
+    parser.add_argument('--log_interval', type=int, default=200,
                       help='Logging interval')
     parser.add_argument('--save_model', action='store_true',
                       help='Whether to save model checkpoints')
@@ -96,43 +94,53 @@ def main():
         config.dataset_name, 
         config.batch_size, 
         config.context_ratio,
-        scale=False
+        scale=True
     )
     
-    # Initialize model
-    print("Initializing model...")
-    model = LatentFlow(
-        dim_x=dims["data_dim"],
-        dim_z=config.z_dim,
-        dim_c=dims["cov_dim"],
-        dim_h=config.h_dim,
-        dim_t=config.t_dim,
-        n_rnn_layers=config.n_rnn_layers,
-        rnn_hidden=config.rnn_hidden,
-        residual_layers=config.n_residual_blocks,
-        residual_channels=config.residual_channels,
-        residual_hidden=config.residual_hidden,
-        rngs=rngs_model,
-        scaler=scaler
-    )
+
+    autoencoder = CausalVAE(
+                        input_dim=dims["data_dim"],
+                        latent_dim=config.z_dim,
+                        hidden_dims=[256, 256],
+                        rngs=rngs_model
+                    )
     
-    # Initialize trainer
-    if config.student_forcing:
-        print("Initializing student forcing trainer")
-        trainer = FlowTrainerSTF(config, model, train_loader, val_loader, rngs_train)
-    else:
-        print("Initializing trainer")
-        trainer = FlowTrainer(config, model, train_loader, val_loader, rngs_train)
+
+
+    print("Training AutoEncoder ...")
+    ae_trainer = AutoEncoderTrainer(config, autoencoder, train_loader, val_loader, rngs_train)
+    trained_ae = ae_trainer.train()
+    print("*** AutoEncoder training complete ***")
+
     
+    
+    flow_model = Flow(
+                    dim_x=config.z_dim,
+                    dim_c=dims["cov_dim"],
+                    dim_h=config.h_dim,
+                    dim_t=config.t_dim,
+                    n_rnn_layers=config.n_rnn_layers,
+                    rnn_hidden=config.rnn_hidden,
+                    residual_layers=config.n_residual_blocks,
+                    residual_channels=config.residual_channels,
+                    residual_hidden=config.residual_hidden,
+                    rngs=rngs_model, 
+                    scaler=scaler,
+                    p0=None
+                    )
+
     # Train model
-    print("Training model")
-    trained_model = trainer.train()
+    print("Training Flow ...")
+    fm_trainer = FlowTrainer(config, flow_model, trained_ae, train_loader, val_loader, rngs_train)
+    trained_flow  = fm_trainer.train()
+    print("*** Flow training complete ***")
     
     # Initialize evaluator
     print("Evaluating model......")
     predictor = JaxPredictor(
         config,
-        trained_model,
+        trained_ae,
+        trained_flow,
         test_data.prediction_length,
         int(test_data.prediction_length * config.context_ratio),
         config.batch_size,
@@ -158,10 +166,9 @@ def main():
         "NRMSE-Sum": agg_metric["m_sum_NRMSE"]
     }
     
-    # Print and log metrics
+    wandb.log(metrics)
     for name, value in metrics.items():
         print(f"{name}: {value}")
-    wandb.log(metrics)
 
 if __name__ == "__main__":
     main()

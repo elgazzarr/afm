@@ -32,6 +32,7 @@ class Visualizer:
         Returns:
             matplotlib.figure.Figure: The figure object containing the plot
         """
+        plt.close('all') 
         fig = plt.figure(figsize=(12, 6))
         ax = plt.gca()
         
@@ -151,6 +152,7 @@ class Visualizer:
         Returns:
             matplotlib.figure.Figure: The figure object containing the plot
         """
+        plt.close('all') 
         fig = plt.figure(figsize=(12, 6))
         ax = plt.gca()
         
@@ -169,14 +171,14 @@ class Visualizer:
             ax.plot(ts, original[:, i],
                    color=colors[i],
                    label=f'{channel_names[i]} (Original)',
-                   linewidth=2,
+                   linewidth=3,
                    zorder=3)
             
             # Plot reconstructed mean
             ax.plot(ts, reconstructed[:, i],
                    color=colors[i],
                    label=f'{channel_names[i]} (Reconstructed)',
-                   linewidth=2,
+                   linewidth=3,
                    linestyle='--',
                    zorder=3)
             

@@ -2,11 +2,15 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 import flax.nnx as nnx
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from .embeddings import SinusodialPosEmb
 from .layers import TimeConditionedDense, FlowWave 
 from gluonts.transform import SimpleTransformation
-
+from .networks import ContextNet
+import diffrax as dfx
+from diffrax import ODETerm, Tsit5, Euler
+import jax.random as jrandom
+from data.scalers import ContextScaler
 
 class Flow(nnx.Module):
     """
@@ -32,52 +36,84 @@ class Flow(nnx.Module):
                  residual_channels: int,
                  residual_hidden: int,
                  rngs: nnx.Rngs,
-                 scaler: SimpleTransformation):
+                 scaler: SimpleTransformation,
+                 p0: Union [nnx.Module, None] = None):
         super().__init__()
 
         self.scaler = scaler
-        self.cells = [
-            nnx.nn.recurrent.OptimizedLSTMCell(
-                in_features=dim_x + dim_c if i == 0 else rnn_hidden,
-                hidden_features=rnn_hidden,
-                rngs=rngs
-            ) for i in range(n_rnn_layers)
-        ]
-        self.rnn_hidden = rnn_hidden
-        self.n_rnn_layers = n_rnn_layers
+        self.dim_x = dim_x
         self.dim_h = dim_h
-        self.hidden_proj = nnx.Linear(rnn_hidden, dim_h, rngs=rngs)
+        self.context_encoder = ContextNet(dim_x, dim_h, dim_c, n_rnn_layers, rnn_hidden, rngs)
         self.vector_field = FlowWave(dim_x, dim_h, dim_c, dim_t, residual_layers, residual_channels, residual_hidden, rngs=rngs)
-
-    def process_history(self,
-                       x_history: jnp.ndarray,
-                       c: jnp.ndarray) -> jnp.ndarray:
-        """Process historical data through multiple LSTM layers."""
-        inputs = jnp.concatenate([x_history, c[:x_history.shape[0]]], axis=-1)
-        
-        # Initialize carries for all layers
-        carries = [(jnp.zeros((self.rnn_hidden)), jnp.zeros((self.rnn_hidden))) 
-                  for _ in range(self.n_rnn_layers)]
-        
-        def scan_fn(carries: List[Tuple], x: jnp.ndarray) -> Tuple:
-            current_input = x
-            new_carries = []
-            for i, (carry, cell) in enumerate(zip(carries, self.cells)):
-                carry, output = cell(carry, current_input)
-                current_input = output
-                new_carries.append(carry)
-            return new_carries, current_input
-
-        final_carries, outputs = jax.lax.scan(scan_fn, carries, inputs)
-        return outputs[-1]  # Return the last hidden state from the last timestep
-
+        self.p0 = p0 if p0 is not None else jrandom.normal
+    
     def __call__(self,
                  z: jnp.ndarray,
-                 x_history: jnp.ndarray,
+                 z_history: jnp.ndarray,
                  c: jnp.ndarray,
                  t: jnp.ndarray) -> jnp.ndarray:
         """Forward pass of the flow model."""
-        h_last = self.process_history(x_history, c)
-        h_last = self.hidden_proj(h_last)
-        x_velocity = self.vector_field(z, h_last, c[x_history.shape[0]], t)
-        return x_velocity
+        h = self.context_encoder(z_history, c)
+        return self.vector_field(z, h, c[z_history.shape[0]], t)
+    
+    
+    def sample_flow(self, history, covariates, n_steps_pred, n_steps_flow, n_samples, key):
+        
+        def predict(
+            key: jax.random.PRNGKey,
+            history: jnp.ndarray,   
+            covariates: jnp.ndarray,
+            n_steps_flow: int,
+            n_steps_pred: int
+        ) -> jnp.ndarray:
+            
+            def vf(t, x, args):
+                history, covariates = args
+                return self(x, history, covariates, t)
+                
+            term = ODETerm(vf)
+            solver = dfx.Euler()
+            dt = 1/n_steps_flow
+
+            context_scaler = ContextScaler()
+            scaled_history, scale = context_scaler.fit_transform(history)
+            context_length = scaled_history.shape[0]
+            
+            # 2. Maintain separate buffers
+            current_scaled = scaled_history  # For model inputs
+            current_original = history       # For final predictions
+            predictions = []
+            
+            for _ in range(n_steps_pred):
+                # 3. Always use initial scale
+                context_scaled = current_scaled[-context_length:]
+                # 4. Generate in SCALED space
+                x0 = self.p0(key, (self.dim_x,))
+                x_next_scaled = dfx.diffeqsolve(
+                    term,
+                    solver,
+                    0., 1.,
+                    dt,
+                    x0,
+                    args=(context_scaled, covariates),
+                    saveat=dfx.SaveAt(t1=True)
+                ).ys
+                
+                # 5. Inverse transform prediction
+                x_next = context_scaler.inverse_transform(x_next_scaled, scale)
+                predictions.append(x_next)
+                
+                # 6. Update buffers
+                current_original = jnp.concatenate([current_original, x_next], axis=0)
+                current_scaled = jnp.concatenate([current_scaled,  context_scaler.transform(x_next, scale)], axis=0)
+
+            return jnp.vstack(predictions)
+        
+        key_samples = jrandom.split(key, n_samples)
+        
+        # First vmap over batch, then over samples
+        vmapped_predict = jax.vmap(predict, in_axes=(None, 0, 0, None, None))  # vmap over batch
+        vmapped_predict = jax.vmap(vmapped_predict, in_axes=(0, None, None, None, None))  # vmap over samples
+        
+        pred_samples = vmapped_predict(key_samples, history, covariates, n_steps_flow, n_steps_pred)
+        return pred_samples

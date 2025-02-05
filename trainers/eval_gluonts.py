@@ -25,7 +25,8 @@ class JaxPredictor(Predictor):
     def __init__(
         self,
         config,
-        prediction_net: nnx.Module,
+        autoencoder: nnx.Module,
+        flow: nnx.Module,
         prediction_length: int,
         context_length: int,
         batch_size: int,
@@ -40,7 +41,8 @@ class JaxPredictor(Predictor):
         self.scaler = scaler
         self.prediction_length = prediction_length
         self.context_length = context_length
-        self.prediction_net = prediction_net
+        self.autoencoder = autoencoder
+        self.flow = flow
         self.required_fields = required_fields
         self.rngs = rngs    
 
@@ -66,17 +68,22 @@ class JaxPredictor(Predictor):
                                         batch_size=self.batch_size,
                                         stack_fn=batchify)
     
-        keys = jrandom.split(self.rngs(), self.config.mcmc_samples)
-        evaluator = FlowEvaluator(self.prediction_net, nfe=self.config.nfe)
 
         for batch in inference_data_loader:
-            history = jnp.array(batch["past_target"])
+            x_history = jnp.array(batch["past_target"])
+            x_history = jax.vmap(self.scaler.transform_instance)(x_history)
             future_covariates = jnp.array(batch["future_time_feat"])
             past_covariates = jnp.array(batch["past_time_feat"])
             covariates = jnp.concatenate([past_covariates, future_covariates], axis=1)
             start_date = batch["forecast_start"]
-            predictions = jax.vmap(jax.vmap(evaluator.predict_trajectory_fixed_context, in_axes=(0,None,None,None,None)),in_axes=(None,0,0,None, None))(keys, history, covariates, self.prediction_length, self.context_length)
-            predictions_scaled = jax.vmap(jax.vmap(self.scaler.inverse_transform))(predictions)
+            z_history = self.autoencoder.encode(x_history)
+
+            z_predictions = self.flow.sample_flow(z_history, covariates, self.prediction_length, self.config.nfe, self.config.mcmc_samples, self.rngs())
+            x_predictions = self.autoencoder.decode(z_predictions) # (n_samples, n_batch, n_time, n_features)
+            # swap axes 0 and 1
+            x_predictions = jnp.swapaxes(x_predictions, 0, 1) # (n_batch, n_samples, n_time, n_features)
+            predictions_scaled = jax.vmap(jax.vmap(self.scaler.inverse_transform))(x_predictions)
+
             predictions_np = np.array(predictions_scaled)
             for i in range(predictions_np.shape[0]):
                 yield SampleForecast(

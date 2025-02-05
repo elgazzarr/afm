@@ -22,15 +22,19 @@ class LinearDecoder(AbstractDecoder):
     
     def __call__(self, z):
         return nnx.gelu(self.linear(z))
-
+    
 class MLPDecoder(AbstractDecoder):
     def __init__(self, dim_z, dim_x, rngs, hidden_dims: List[int] = [128]):
-        self.mlp = nnx.Sequential(nnx.Linear(dim_z, hidden_dims[0], rngs=rngs), nnx.gelu)
+        layers = [nnx.Linear(dim_z, hidden_dims[0], rngs=rngs), nnx.gelu]
         for i in range(1, len(hidden_dims)):
-            self.mlp.append(nnx.Linear(hidden_dims[i-1], hidden_dims[i], rngs=rngs))
-            self.mlp.append(nnx.gelu)
-        self.mlp.append(nnx.Linear(hidden_dims[-1], dim_x, rngs=rngs))
+            layers.extend([
+                nnx.Linear(hidden_dims[i-1], hidden_dims[i], rngs=rngs),
+                nnx.gelu
+            ])
+        layers.append(nnx.Linear(hidden_dims[-1], dim_x, rngs=rngs))
     
+        self.mlp = nnx.Sequential(*layers)
+
     def __call__(self, z):
         return self.mlp(z)
 
