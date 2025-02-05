@@ -9,7 +9,6 @@ from trainers.flow_eval import FlowEvaluator
 from utils.visualization import Visualizer
 import jax.random as jrandom
 from matplotlib import pyplot as plt
-from data.scalers import ContextScaler
 from copy import deepcopy
 import diffrax as dfx
 from diffrax import ODETerm, Tsit5, Euler
@@ -45,7 +44,7 @@ class FlowTrainer:
     rngs: nnx.Rngs
     ) -> float:
         # 1. Compute scale ONCE using context window
-        context_scaler = ContextScaler()
+        context_scaler = flow_model.context_scaler
         scaled_history, scale = jax.vmap(context_scaler.fit_transform)(history)
         scaled_future = jax.vmap(context_scaler.transform)(future, scale)  # (batch, pred_len, dim)
 
@@ -61,18 +60,13 @@ class FlowTrainer:
             x_past = carry['x_past']
             rng = carry['rng']
             rng, t_rng, flow_rng = jax.random.split(rng, 3)
-            
-            # 3. Use pre-scaled future values directly
-            x_next = scaled_future[:, i]  # Already scaled
-            
+            x_next = scaled_future[:, i]  
             t = jax.random.uniform(t_rng, (x_next.shape[0],), minval=0.0, maxval=1.0)
-            x0 = flow_model.p0(flow_rng, x_next.shape)
-            #x0 = flow_model.p0.sample(flow_rng, x_past[:, -1])
+            x0 = jax.lax.stop_gradient(flow_model.p0.sample(flow_rng, x_past[:, -1]))
             xt = (1 - t[:, None])*x0 + t[:, None]*x_next
             pred_flow = jax.vmap(flow_model)(xt, x_past, covariates, t)
             optimal_flow = x_next - x0
             flow_loss = jnp.mean(jnp.square(pred_flow - optimal_flow))            
-            # 4. Update with SCALED values
             new_x_past = jnp.concatenate([x_past, x_next[:, None]], axis=1)[:, -window_size:]
             
             return {

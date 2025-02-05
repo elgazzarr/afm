@@ -10,7 +10,7 @@ from .networks import ContextNet
 import diffrax as dfx
 from diffrax import ODETerm, Tsit5, Euler
 import jax.random as jrandom
-from data.scalers import ContextScaler
+from data.scalers import ContextScaler, NoContextScaler
 
 class Flow(nnx.Module):
     """
@@ -37,6 +37,7 @@ class Flow(nnx.Module):
                  residual_hidden: int,
                  rngs: nnx.Rngs,
                  scaler: SimpleTransformation,
+                 context_scaling: bool,
                  p0: Union [nnx.Module, None] = None):
         super().__init__()
 
@@ -46,6 +47,7 @@ class Flow(nnx.Module):
         self.context_encoder = ContextNet(dim_x, dim_h, dim_c, n_rnn_layers, rnn_hidden, rngs)
         self.vector_field = FlowWave(dim_x, dim_h, dim_c, dim_t, residual_layers, residual_channels, residual_hidden, rngs=rngs)
         self.p0 = p0 if p0 is not None else jrandom.normal
+        self.context_scaler = ContextScaler() if context_scaling else NoContextScaler()
     
     def __call__(self,
                  z: jnp.ndarray,
@@ -75,7 +77,7 @@ class Flow(nnx.Module):
             solver = dfx.Euler()
             dt = 1/n_steps_flow
 
-            context_scaler = ContextScaler()
+            context_scaler = self.context_scaler
             scaled_history, scale = context_scaler.fit_transform(history)
             context_length = scaled_history.shape[0]
             
@@ -85,10 +87,8 @@ class Flow(nnx.Module):
             predictions = []
             
             for _ in range(n_steps_pred):
-                # 3. Always use initial scale
                 context_scaled = current_scaled[-context_length:]
-                # 4. Generate in SCALED space
-                x0 = self.p0(key, (self.dim_x,))
+                x0 = self.p0.sample(key, context_scaled[-1][None, :])[0]
                 x_next_scaled = dfx.diffeqsolve(
                     term,
                     solver,

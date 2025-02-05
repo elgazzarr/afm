@@ -2,24 +2,27 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 from functools import partial
-from models.networks import p0_AR, p0_AR_fixed
+from models.priors import p0_AR_learnable, p0_AR_fixed, p0_gaussian
 
 class CausalVAE(nnx.Module):
-    def __init__(self, input_dim, latent_dim, hidden_dims, rngs):
+    def __init__(self, input_dim, latent_dim, hidden_dims,  n_layers, kernel_size, rngs, prior="AR_learn"):
         # Initialize with proper weight scaling for stability
-        self.encoder = CausalEncoder(input_dim, latent_dim, hidden_dims, rngs)
-        self.decoder = CausalDecoder(latent_dim, input_dim, hidden_dims, rngs)
-        self.prior = p0_AR(latent_dim, rngs) # Transition prior for latent space
+        self.encoder = CausalEncoder(input_dim, latent_dim, hidden_dims, n_layers, kernel_size, rngs)
+        self.decoder = CausalDecoder(latent_dim, input_dim, hidden_dims, n_layers, kernel_size, rngs)
+        if prior == "AR_learn":
+            self.prior = p0_AR_learnable(latent_dim, rngs)
+        elif prior == "AR_fixed":
+            self.prior = p0_AR_fixed(latent_dim, rngs)
+        elif prior == "Gaussian":
+            self.prior = p0_gaussian(latent_dim, rngs)
+        else:
+            raise ValueError(f"Prior {prior} not recognized")
 
         
-    def __call__(self, x, key):  # x: [seq_len, input_dim]
-        # Add input normalization
-        #x = (x - jnp.mean(x, axis=0, keepdims=True)) / (jnp.std(x, axis=0, keepdims=True) + 1e-5)
-        mean, logvar = self.encoder(x)  # [seq_len, latent_dim]
+    def __call__(self, x, key): 
+        mean, logvar = self.encoder(x) 
         z = self.reparameterize(key, mean, logvar)
-        recon = self.decoder(z)  # [seq_len, input_dim]
-
-        
+        recon = self.decoder(z) 
         return recon, mean, logvar
     
     def reparameterize(self, key, mean, logvar):
@@ -39,12 +42,12 @@ class CausalVAE(nnx.Module):
         return self.decoder(z)
 
 class CausalEncoder(nnx.Module):
-    def __init__(self, input_dim, latent_dim, hidden_dims, rngs):
+    def __init__(self, input_dim, latent_dim, hidden_dims, n_layers, kernel_size, rngs):
         # Initialize with proper scaling
         kernel_init = nnx.initializers.variance_scaling(1.0, 'fan_in', 'normal')
         
         self.conv_init = nnx.Conv(
-            input_dim, hidden_dims[0], 
+            input_dim, hidden_dims, 
             kernel_size=1, 
             padding='VALID',
             kernel_init=kernel_init,
@@ -53,16 +56,16 @@ class CausalEncoder(nnx.Module):
         
         self.conv_layers = [
             nnx.Conv(
-                dim, dim, 
-                kernel_size=3, 
+                hidden_dims, hidden_dims, 
+                kernel_size=kernel_size,
                 padding='CAUSAL',
                 kernel_init=kernel_init,
                 rngs=rngs
-            ) for dim in hidden_dims
+            ) for _ in range(n_layers)
         ]
         
-        self.mean = nnx.Linear(hidden_dims[-1], latent_dim, rngs=rngs)
-        self.logvar = nnx.Linear(hidden_dims[-1], latent_dim, rngs=rngs)
+        self.mean = nnx.Linear(hidden_dims, latent_dim, rngs=rngs)
+        self.logvar = nnx.Linear(hidden_dims, latent_dim, rngs=rngs)
         
     def __call__(self, x):
         x = self.conv_init(x)
@@ -79,12 +82,12 @@ class CausalEncoder(nnx.Module):
         return mean, logvar
 
 class CausalDecoder(nnx.Module):
-    def __init__(self, latent_dim, output_dim, hidden_dims, rngs):
+    def __init__(self, latent_dim, output_dim, hidden_dims, n_layers, kernel_size, rngs):
         # Initialize with proper scaling
         kernel_init = nnx.initializers.variance_scaling(1.0, 'fan_in', 'normal')
         
         self.conv_init = nnx.Conv(
-            latent_dim, hidden_dims[0], 
+            latent_dim, hidden_dims, 
             kernel_size=1, 
             padding='VALID',
             kernel_init=kernel_init,
@@ -93,16 +96,16 @@ class CausalDecoder(nnx.Module):
         
         self.conv_layers = [
             nnx.Conv(
-                dim, dim, 
-                kernel_size=1, 
+                hidden_dims, hidden_dims,
+                kernel_size=1, # not sure about this 
                 padding='CAUSAL',
                 kernel_init=kernel_init,
                 rngs=rngs
-            ) for dim in hidden_dims
+            ) for _ in range(n_layers)
         ]
         
         self.output = nnx.Conv(
-            hidden_dims[-1], output_dim, 
+            hidden_dims, output_dim, 
             kernel_size=1, 
             padding='VALID',
             kernel_init=kernel_init,

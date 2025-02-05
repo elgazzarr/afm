@@ -25,42 +25,51 @@ def parse_args():
     # Dataset parameters
     parser.add_argument('--dataset_name', type=str, default='solar_nips',
                       help='Name of the dataset')
-    parser.add_argument('--context_ratio', type=float, default=3.0,
+    parser.add_argument('--context_ratio', type=float, default=2.0,
                       help='Context ratio for dataset')
     # Training parameters
     parser.add_argument('--seed', type=int, default=1,
                       help='Random seed')
     parser.add_argument('--batch_size', type=int, default=128,
                       help='Batch size')
-    parser.add_argument('--training_steps', type=int, default=5000,
+    parser.add_argument('--training_steps', type=int, default=2000,
                       help='Number of training steps')
     parser.add_argument('--learning_rate', type=float, default=1e-3,
                       help='Learning rate')
     parser.add_argument('--patience', type=int, default=10,
                       help='Patience for early stopping')
-    
-    # Model architecture
-    parser.add_argument('--z_dim', type=int, default=256)
+        
+    # Model architecture (AE)
+    parser.add_argument('--z_dim', type=int, default=128)
+    parser.add_argument('--n_conv_layers', type=int, default=2)
+    parser.add_argument('--conv_channels', type=int, default=128)
+    parser.add_argument('--conv_kernel_size', type=int, default=3)
+    parser.add_argument('--prior', type=str, default='Gaussian', choices=['Gaussian', 'AR_learn', 'AR_fixed'],
+                      help='Prior distribution for latent space')
+
+    # Model architecture (Flow)
     parser.add_argument('--h_dim', type=int, default=128,
-                      help='Hidden dimension')
+                      help='Hidden dimension of the RNN')
     parser.add_argument('--t_dim', type=int, default=32,
                       help='Time dimension')
-    parser.add_argument('--n_rnn_layers', type=int, default=3,
+    parser.add_argument('--n_rnn_layers', type=int, default=2,
                       help='Number of RNN layers')
     parser.add_argument('--rnn_hidden', type=int, default=64,
                       help='RNN hidden dimension')
     parser.add_argument('--n_residual_blocks', type=int, default=8,
                       help='Number of residual blocks')
-    parser.add_argument('--residual_channels', type=int, default=8,
+    parser.add_argument('--residual_channels', type=int, default=32,
                       help='Number of residual channels')
     parser.add_argument('--residual_hidden', type=int, default=64,
-                      help='Residual hidden dimension')
+                      help='Residual hidden dimension'),
+    parser.add_argument('--context_scaling', type=bool, default=False,
+                        help='Whether to mean scale context')
     
     # Inference parameters
     parser.add_argument('--mcmc_samples', type=int, default=100,
                       help='Number of MCMC samples')
     parser.add_argument('--nfe', type=int, default=100,
-                      help='Number of function evaluations')
+                      help='Number of function evaluations') 
     
     # Logging parameters
     parser.add_argument('--wandb_project', type=str, default='flowtime',
@@ -101,8 +110,11 @@ def main():
     autoencoder = CausalVAE(
                         input_dim=dims["data_dim"],
                         latent_dim=config.z_dim,
-                        hidden_dims=[256, 256],
-                        rngs=rngs_model
+                        hidden_dims=config.conv_channels,
+                        n_layers=config.n_conv_layers,
+                        kernel_size=config.conv_kernel_size,
+                        rngs=rngs_model,
+                        prior=config.prior
                     )
     
 
@@ -126,7 +138,8 @@ def main():
                     residual_hidden=config.residual_hidden,
                     rngs=rngs_model, 
                     scaler=scaler,
-                    p0=None
+                    context_scaling=config.context_scaling,
+                    p0=trained_ae.prior
                     )
 
     # Train model

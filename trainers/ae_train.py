@@ -29,7 +29,7 @@ class AutoEncoderTrainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.rngs = rngs 
-        self.optimizer = nnx.Optimizer(self.model , optax.adam(config.learning_rate/5.0))
+        self.optimizer = nnx.Optimizer(self.model , optax.adam(config.learning_rate/2.0))
         self.visualizer = Visualizer()
         self.beta_scheduler =  optax.schedules.linear_schedule(0.0, 1.0, config.training_steps//3)
 

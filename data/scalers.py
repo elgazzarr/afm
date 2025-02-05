@@ -42,6 +42,35 @@ class ContextScaler:
     def inverse_transform(self, x: jnp.ndarray, scale: jnp.ndarray) -> jnp.ndarray:
         """Inverse transform scaled data."""
         return x * scale
+    
+class NoContextScaler:
+    def __init__(self, minimum_scale: float = 1e-10):
+        """Initialize with same interface as ContextScaler but doesn't use parameters."""
+        pass
+
+    def fit_transform(self, context: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        """
+        Pass through the context unchanged and return unit scale.
+        Args:
+            context: Input array of shape (time, features)
+        Returns:
+            Tuple of (context, ones_scale)
+        """
+        scale = jnp.ones((1, context.shape[1]))  # (1, features)
+        return context, scale
+
+    def transform(self, x: jnp.ndarray, scale: jnp.ndarray) -> jnp.ndarray:
+        """Pass through data unchanged."""
+        return x
+
+    def transform_features(self, x: jnp.ndarray, scale: jnp.ndarray) -> jnp.ndarray:
+        """Pass through features unchanged."""
+        return x
+
+    def inverse_transform(self, x: jnp.ndarray, scale: jnp.ndarray) -> jnp.ndarray:
+        """Pass through data unchanged."""
+        return x
+    
 
 class NothingScaler(SimpleTransformation):
     def __init__(self, *args, **kwargs):
@@ -116,7 +145,6 @@ class StandardScaler(SimpleTransformation):
             raise ValueError("Scaler must be fitted before transform")
         
         data = jnp.transpose(data, (1, 0))
-        # data: [channels, time], mean/std: [channels, 1]
         scaled_data = (data - self.mean) / self.std
         scaled_data = jnp.transpose(scaled_data, (1, 0))
         return scaled_data
