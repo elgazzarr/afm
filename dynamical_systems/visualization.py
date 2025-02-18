@@ -55,9 +55,9 @@ def plot_trajectories(ts: np.ndarray,
     extra_end_idx = history_end_idx + len(pred_mean)
     
     # Add background shading
-    ax.axvspan(ts[0], ts[history_end_idx], color='#d0d0d0', alpha=0.5)
+    ax.axvspan(ts[0], ts[history_end_idx], color='#d0d0d0', alpha=0.7)
     ax.axvspan(ts[history_end_idx], ts[pred_end_idx], color='#e0e0e0', alpha=0.5)
-    ax.axvspan(ts[pred_end_idx], ts[extra_end_idx], color='#f0f0f0', alpha=0.3)
+    ax.axvspan(ts[pred_end_idx], ts[extra_end_idx], color='#f0f0f0', alpha=0.1)
     
     for i in range(n_channels):
         # Plot confidence intervals
@@ -113,6 +113,7 @@ def plot_trajectories(ts: np.ndarray,
         if not os.path.exists(os.path.dirname(save_path)):
             os.makedirs(os.path.dirname(save_path))
         plt.savefig(save_path)
+        plt.savefig(save_path.replace('.pdf', '.eps'))
     return fig 
 
 def plot_phase_portrait(system, 
