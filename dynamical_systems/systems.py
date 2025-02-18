@@ -23,10 +23,12 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         params = jnp.array([1.3, 0.9, 0.8, 1.8])
         data_dim = 2
-        initial_state = lambda key, n_samples: jrandom.uniform(
-            key, (n_samples, data_dim), minval=0, maxval=5)
+        initial_state = lambda key, n_samples: jrandom.uniform(key, (n_samples, data_dim), minval=0, maxval=5)
+        solver = dfx.Euler()
         
-        return DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system =  DynamicalSystem(vector_field, params, data_dim, initial_state, solver, stochastic)
+        system.vector_field = dfx.ODETerm(vector_field)
+        return system
     
     elif name == 'lorenz':
         def vector_field(t, x, args):
@@ -64,17 +66,18 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
     
     elif name == 'vanderpol':
         def vector_field(t, x, args):
-            mu = args
+            mu, = args
             dx1 = x[1]
             dx2 = mu*(1 - x[0]**2)*x[1] - x[0]
             return jnp.array([dx1, dx2])
         
         params = jnp.array([0.1])
         data_dim = 2
-        initial_state = lambda key, n_samples: jrandom.uniform(
-            key, (n_samples, data_dim), minval=-2, maxval=2)
+        initial_state = lambda key, n_samples: jrandom.uniform(key, (n_samples, data_dim), minval=-2, maxval=2)
         
-        return DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system =  DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system.vector_field = dfx.ODETerm(vector_field)
+        return system
     
     elif name == 'harmonic_oscillator':
         def vector_field(t, x, args):
@@ -88,7 +91,9 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         initial_state = lambda key, n_samples: jrandom.uniform(
             key, (n_samples, data_dim), minval=-2, maxval=2)
         
-        return DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system =  DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system.vector_field = dfx.ODETerm(vector_field)
+        return system
     
     elif name == 'fitzhugh_nagumo':
         def vector_field(t, x, args):
@@ -102,7 +107,9 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         initial_state = lambda key, n_samples: jrandom.uniform(
             key, (n_samples, data_dim), minval=-2, maxval=2)
         
-        return DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system =  DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system.vector_field = dfx.ODETerm(vector_field)
+        return system
 
     elif name == 'duffing':
         def vector_field(t, x, args):
@@ -113,11 +120,12 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         params = jnp.array([1.0, -1.0, 0.2, 0.3, 1.2])  # Example parameters
         data_dim = 2
-        initial_state = lambda key, n_samples: jrandom.uniform(
-            key, (n_samples, data_dim), minval=-1, maxval=1)
-        
-        return DynamicalSystem(vector_field, params, data_dim, initial_state)
-    
+        initial_state = lambda key, n_samples: jrandom.uniform(key, (n_samples, data_dim), minval=-1, maxval=1)
+        system =  DynamicalSystem(vector_field, params, data_dim, initial_state, solver, stochastic)
+        system.vector_field = dfx.ODETerm(vector_field)
+        return system
+
+
     elif name == 'brusselator':
         def vector_field(t, x, args):
             A, B = args
@@ -127,10 +135,11 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         params = jnp.array([1.0, 3.0])  # A = 1.0, B = 3.0 (example)
         data_dim = 2
-        initial_state = lambda key, n_samples: jrandom.uniform(
-            key, (n_samples, data_dim), minval=0, maxval=2)
+        initial_state = lambda key, n_samples: jrandom.uniform(key, (n_samples, data_dim), minval=0, maxval=2)
         
-        return DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system =  DynamicalSystem(vector_field, params, data_dim, initial_state)
+        system.vector_field = dfx.ODETerm(vector_field)
+        return system
     
     else:
         raise ValueError(f'System {name} not implemented')

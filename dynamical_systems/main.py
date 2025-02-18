@@ -12,12 +12,14 @@ import diffrax as dfx
 from seq_priors import generate_brownian_timeseries
 import argparse
 from sample import sample_flow
+import wandb
+from metrics import compute_crps, compute_nrmse
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Evaluating Autoregressive vs Non-Autoregressive Flow matching for forecasting dynamical systems')
 
     parser.add_argument('--system', type=str, default='lorenz',
-                        options=['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator', 'brusselator'],
+                        choices=['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator', 'brusselator'],
                       help='Name of the dynamical system')
     parser.add_argument('--stochastic', type=bool, default=False,
                         help='Whether the system is stochastic')
@@ -30,13 +32,14 @@ def parse_args():
                         help='Prediction size')
     parser.add_argument('--num_epochs', type=int, default=100,
                         help='Number of epochs')
+    parser.add_argument('--wandb_project', type=str, default='flowtime',
+                      help='W&B project name')
     return parser.parse_args()
 
 def main():
-    # Parse arguments
     args = parse_args()
-    # Set random seed
     key = jrandom.PRNGKey(0)
+    wandb.init(project=args.wandb_project, config=vars(args), name=args.system)
 
     # Set up configuration
     config = ModelConfig(
@@ -81,38 +84,67 @@ def main():
         rngs=nnx.Rngs(key_noar)
     )
 
-        # Train NoAR model
+    # Train NoAR model
     ar_trainer = ARTrainer(ar_model, learning_rate=config.learning_rate)
     noar_trainer = NoARTrainer(noar_model, learning_rate=config.learning_rate)
 
     # Train models
-    ar_losses = ar_trainer.train(train_loader, test_loader, num_epochs=args.num_epochs)
-    noar_losses = noar_trainer.train(train_loader, test_loader, num_epochs=args.num_epochs)
+    print('Training AR Model')
+    ar_trainer.train(train_loader, test_loader, num_epochs=args.num_epochs)
+    print('Training NoAR Model')
+    noar_trainer.train(train_loader, test_loader, num_epochs=args.num_epochs*2)
+    print('Training complete')
+    print('#'*50)
 
     # Generate predictions
-    def sample_trajectories(model, key, num_samples=50, nfe=50):
+    def sample_trajectories(model, key, num_samples=50, nfe=20):
         history, covariates, true_future, true_exp = next(iter(test_loader))
         true_fe = jnp.concatenate([true_future, true_exp], axis=1)
         predictions = sample_flow(model, key, history, covariates, n_steps_flow=nfe, n_steps_pred=config.prediction_size+config.extrapolation_size, n_samples=num_samples)
         return jnp.stack(predictions), history, true_fe
     
+    # Modified evaluation function
+    @jax.jit
+    def evaluate_batch(predictions, true_future):
+        """Evaluate metrics for a single batch."""
+        crps = compute_crps(predictions, true_future)
+        nrmse = compute_nrmse(predictions, true_future)
+        return crps, nrmse
+
     def evaluate_predictions(model, key, test_loader, nfe=50):
-        crps = []
-        for i, (history, covariates, true_future, true_exp) in enumerate(test_loader):
-            predictions = sample_flow(model, key, history, covariates, n_steps_flow=nfe, n_steps_pred=config.prediction_size+config.extrapolation_size, n_samples=50)
-            crps = 
+        all_crps = []
+        all_nrmse = []
         
-    
+        for i, (history, covariates, true_future, true_exp) in enumerate(test_loader):
+            print(i)
+            predictions = sample_flow(model, key, history, covariates, 
+                                    n_steps_flow=nfe, 
+                                    n_steps_pred=config.prediction_size+config.extrapolation_size, 
+                                    n_samples=50)
+            true_future = jnp.concatenate([true_future, true_exp], axis=1)
+            if isinstance(model, NoARFlow):
+                predictions = jnp.squeeze(predictions, axis=2)
+            crps, nrmse = evaluate_batch(predictions, true_future)
+            
+            all_crps.append(crps)
+            all_nrmse.append(nrmse)
+        
+        return jnp.mean(jnp.stack(all_crps)), jnp.mean(jnp.stack(all_nrmse))
+            
+    print('Evaluating models...')
+    ar_crps, ar_nrmse = evaluate_predictions(ar_model, key_ar, test_loader)
+    noar_crps, noar_nrmse = evaluate_predictions(noar_model, key_noar, test_loader)
+    print(f'AR Model CRPS: {ar_crps}, NRMSE: {ar_nrmse}')
+    print(f'NoAR Model CRPS: {noar_crps}, NRMSE: {noar_nrmse}')
+    print('#'*50)
+
     ar_predictions, ar_history, ar_true = sample_trajectories(ar_model, key)
     noar_predictions, noar_history, noar_true = sample_trajectories(noar_model, key)
     noar_predictions = jnp.squeeze(noar_predictions, axis=2)
 
     for i in range(5):
-        plot_trajectories(config.ts, ar_history[i], ar_predictions[:,i], ar_true[i], config.extrapolation_size, title='AR Model Predictions', 
-                          save_path=f'figures/{config.system}/ar_predictions_{i}.pdf')
-        plot_trajectories(config.ts, noar_history[i], noar_predictions[:,i], noar_true[i], config.extrapolation_size, title='NoAR Model Predictions',
-                           save_path=f'figures/{config.system}/noar_predictions_{i}.pdf')
-
+        plot_trajectories(config.ts, ar_history[i], ar_predictions[:,i], ar_true[i], config.extrapolation_size, title='AR Model Predictions', save_path=f'results/{config.system}/ar_predictions_{i}.pdf')
+        plot_trajectories(config.ts, noar_history[i], noar_predictions[:,i], noar_true[i], config.extrapolation_size, title='NoAR Model Predictions', save_path=f'results/{config.system}/noar_predictions_{i}.pdf')
     return
 
 

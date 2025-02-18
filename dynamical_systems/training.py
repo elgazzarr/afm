@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from tqdm import tqdm
 from functools import partial
 from seq_priors import generate_brownian_timeseries
-
+import wandb
 
 class BaseTrainer:
     def __init__(self, model: nnx.Module, learning_rate: float):

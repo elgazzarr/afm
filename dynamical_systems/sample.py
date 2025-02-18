@@ -3,7 +3,7 @@ from seq_priors import generate_brownian_timeseries
 import jax.random as jrandom
 import jax.numpy as jnp
 from models import NoARFlow, ARFlow
-
+import jax
 
 def sample_flow(model, key, history, covariates, n_steps_flow, n_steps_pred, n_samples):
 
