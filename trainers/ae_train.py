@@ -109,7 +109,7 @@ class AutoEncoderTrainer:
                 )
                 wandb.log({f"Reconstruction": wandb.Image(fig)})
                 plt.close(fig)
-        
+
         return avg_val_loss
      
 

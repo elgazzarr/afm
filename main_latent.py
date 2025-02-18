@@ -23,7 +23,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Flow Matching for Time Series')
     
     # Dataset parameters
-    parser.add_argument('--dataset_name', type=str, default='solar_nips',
+    parser.add_argument('--dataset_name', type=str, default='traffic_nips',
                       help='Name of the dataset')
     parser.add_argument('--context_ratio', type=float, default=2.0,
                       help='Context ratio for dataset')
@@ -32,7 +32,7 @@ def parse_args():
                       help='Random seed')
     parser.add_argument('--batch_size', type=int, default=128,
                       help='Batch size')
-    parser.add_argument('--training_steps', type=int, default=2000,
+    parser.add_argument('--training_steps', type=int, default=3000,
                       help='Number of training steps')
     parser.add_argument('--learning_rate', type=float, default=1e-3,
                       help='Learning rate')
@@ -40,7 +40,7 @@ def parse_args():
                       help='Patience for early stopping')
         
     # Model architecture (AE)
-    parser.add_argument('--z_dim', type=int, default=128)
+    parser.add_argument('--z_dim', type=int, default=64)
     parser.add_argument('--n_conv_layers', type=int, default=2)
     parser.add_argument('--conv_channels', type=int, default=128)
     parser.add_argument('--conv_kernel_size', type=int, default=3)
@@ -52,13 +52,13 @@ def parse_args():
                       help='Hidden dimension of the RNN')
     parser.add_argument('--t_dim', type=int, default=32,
                       help='Time dimension')
-    parser.add_argument('--n_rnn_layers', type=int, default=2,
+    parser.add_argument('--n_rnn_layers', type=int, default=3,
                       help='Number of RNN layers')
     parser.add_argument('--rnn_hidden', type=int, default=64,
                       help='RNN hidden dimension')
     parser.add_argument('--n_residual_blocks', type=int, default=8,
                       help='Number of residual blocks')
-    parser.add_argument('--residual_channels', type=int, default=32,
+    parser.add_argument('--residual_channels', type=int, default=8,
                       help='Number of residual channels')
     parser.add_argument('--residual_hidden', type=int, default=64,
                       help='Residual hidden dimension'),
@@ -74,7 +74,7 @@ def parse_args():
     # Logging parameters
     parser.add_argument('--wandb_project', type=str, default='flowtime',
                       help='W&B project name')
-    parser.add_argument('--log_interval', type=int, default=200,
+    parser.add_argument('--log_interval', type=int, default=500,
                       help='Logging interval')
     parser.add_argument('--save_model', action='store_true',
                       help='Whether to save model checkpoints')
