@@ -155,6 +155,7 @@ def prepare_data(system, config, key):
     extrapolation_size = config.extrapolation_size
     for i in range(2):  # Train and test
         key, subkey = jrandom.split(key)
+        n_samples = config.n_train_test_samples if i == 0 else int(0.25 * config.n_train_test_samples)
         x0 = system.initial_state(subkey, config.n_train_test_samples)
         trajectories = jax.vmap(solve_single)(x0)
         

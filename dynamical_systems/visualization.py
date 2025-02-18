@@ -35,7 +35,7 @@ def plot_trajectories(ts: np.ndarray,
                      save_path: Optional[str] = None):
     """Plot trajectory predictions with confidence intervals."""
     plt.close()
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(9, 6))
     
     n_channels = history.shape[1]
     colors = list(mcolors.TABLEAU_COLORS)[:n_channels]
@@ -55,9 +55,10 @@ def plot_trajectories(ts: np.ndarray,
     extra_end_idx = history_end_idx + len(pred_mean)
     
     # Add background shading
-    ax.axvspan(ts[0], ts[history_end_idx], color='#d0d0d0', alpha=0.7)
-    ax.axvspan(ts[history_end_idx], ts[pred_end_idx], color='#e0e0e0', alpha=0.5)
-    ax.axvspan(ts[pred_end_idx], ts[extra_end_idx], color='#f0f0f0', alpha=0.1)
+    ax.axvspan(ts[0], ts[history_end_idx], color="lightgray", alpha=0.7)  # History (soft gray)
+    ax.axvspan(ts[history_end_idx], ts[pred_end_idx], color="lightblue", alpha=0.7)  # Prediction (soft blue)
+    ax.axvspan(ts[pred_end_idx], ts[extra_end_idx], color="lightyellow", alpha=0.7)  # Extrapolation (soft yellow)
+
     
     for i in range(n_channels):
         # Plot confidence intervals
@@ -99,21 +100,12 @@ def plot_trajectories(ts: np.ndarray,
                     # Add region labels
     y_range = ax.get_ylim()
     y_pos = y_range[1] - 0.05 * (y_range[1] - y_range[0])
-    #ax.text(ts[history_end_idx//2], y_pos, 'Observed', 
-    #        horizontalalignment='center', verticalalignment='top', fontsize=10, color='#666666')
-    #ax.text(ts[history_end_idx + extra_end_idx//2 - extrapolation_size], y_pos, 'Prediction', 
-    #        horizontalalignment='center', verticalalignment='top', fontsize=10, color='#666666')
-    #ax.text(ts[history_end_idx + extra_end_idx//2], y_pos, 'Extrapolation', 
-    #        horizontalalignment='center', verticalalignment='top', fontsize=10, color='#666666')
-    
-    ax.set_title(title)
     #ax.legend()
     
     if save_path:
         if not os.path.exists(os.path.dirname(save_path)):
             os.makedirs(os.path.dirname(save_path))
-        plt.savefig(save_path)
-        plt.savefig(save_path.replace('.pdf', '.eps'))
+        plt.savefig(save_path, bbox_inches='tight')
     return fig 
 
 def plot_phase_portrait(system, 
@@ -137,7 +129,6 @@ def plot_phase_portrait(system,
         ax.set_ylabel('x₂')
         ax.set_zlabel('x₃')
     
-    plt.title(title)
     if save_path:
         plt.savefig(save_path)
     plt.close()

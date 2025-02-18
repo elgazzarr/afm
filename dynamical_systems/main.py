@@ -14,21 +14,25 @@ import argparse
 from sample import sample_flow
 import wandb
 from metrics import compute_crps, compute_nrmse
+import warnings
+warnings.filterwarnings("ignore", message="Unable to parse backend config for custom call")
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Evaluating Autoregressive vs Non-Autoregressive Flow matching for forecasting dynamical systems')
 
     parser.add_argument('--system', type=str, default='lorenz',
-                        choices=['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator', 'brusselator'],
+                        choices=['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator', 'brusselator', 'fitzhugh_nagumo', 'duffing'],
                       help='Name of the dynamical system')
-    parser.add_argument('--stochastic', type=bool, default=False,
+    parser.add_argument('--stochastic', type=bool, default=True,
                         help='Whether the system is stochastic')
     parser.add_argument('--t1', type=float, default=20.0)
-    parser.add_argument('--num_timepoints', type=int, default=200,
+    parser.add_argument('--num_timepoints', type=int, default=150,
                         help='Number of timepoints')
-    parser.add_argument('--history_size', type=int, default=50,
+    parser.add_argument('--history_size', type=int, default=75,
                         help='History size')
-    parser.add_argument('--prediction_size', type=int, default=100,
+    parser.add_argument('--prediction_size', type=int, default=50,
                         help='Prediction size')
     parser.add_argument('--num_epochs', type=int, default=100,
                         help='Number of epochs')
@@ -50,7 +54,7 @@ def main():
         t0=0.0,
         t1=args.t1,
         n_train_test_samples=1024,
-        batch_size=128
+        batch_size=256,
     )
 
     # Create system
@@ -97,14 +101,14 @@ def main():
     print('#'*50)
 
     # Generate predictions
-    def sample_trajectories(model, key, num_samples=50, nfe=20):
+    def sample_trajectories(model, key, num_samples=50, nfe=50):
         history, covariates, true_future, true_exp = next(iter(test_loader))
         true_fe = jnp.concatenate([true_future, true_exp], axis=1)
         predictions = sample_flow(model, key, history, covariates, n_steps_flow=nfe, n_steps_pred=config.prediction_size+config.extrapolation_size, n_samples=num_samples)
         return jnp.stack(predictions), history, true_fe
     
     # Modified evaluation function
-    @jax.jit
+    @nnx.jit
     def evaluate_batch(predictions, true_future):
         """Evaluate metrics for a single batch."""
         crps = compute_crps(predictions, true_future)
@@ -116,7 +120,6 @@ def main():
         all_nrmse = []
         
         for i, (history, covariates, true_future, true_exp) in enumerate(test_loader):
-            print(i)
             predictions = sample_flow(model, key, history, covariates, 
                                     n_steps_flow=nfe, 
                                     n_steps_pred=config.prediction_size+config.extrapolation_size, 
@@ -141,6 +144,8 @@ def main():
     ar_predictions, ar_history, ar_true = sample_trajectories(ar_model, key)
     noar_predictions, noar_history, noar_true = sample_trajectories(noar_model, key)
     noar_predictions = jnp.squeeze(noar_predictions, axis=2)
+
+    wandb.log({'ar_crps': ar_crps, 'ar_nrmse': ar_nrmse, 'noar_crps': noar_crps, 'noar_nrmse': noar_nrmse})
 
     for i in range(5):
         plot_trajectories(config.ts, ar_history[i], ar_predictions[:,i], ar_true[i], config.extrapolation_size, title='AR Model Predictions', save_path=f'results/{config.system}/ar_predictions_{i}.pdf')
