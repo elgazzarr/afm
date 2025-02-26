@@ -114,12 +114,7 @@ def main():
     )
     
     # Initialize trainer
-    if config.student_forcing:
-        print("Initializing student forcing trainer")
-        trainer = FlowTrainerSTF(config, model, train_loader, val_loader, rngs_train)
-    else:
-        print("Initializing trainer")
-        trainer = FlowTrainer(config, model, train_loader, val_loader, rngs_train)
+    trainer = FlowTrainer(config, model, train_loader, val_loader, rngs_train)
     
     # Train model
     print("Training model")

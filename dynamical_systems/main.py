@@ -28,22 +28,24 @@ def parse_args():
     parser.add_argument('--stochastic', type=bool, default=True,
                         help='Whether the system is stochastic')
     parser.add_argument('--t1', type=float, default=20.0)
-    parser.add_argument('--num_timepoints', type=int, default=150,
+    parser.add_argument('--num_timepoints', type=int, default=200,
                         help='Number of timepoints')
     parser.add_argument('--history_size', type=int, default=75,
                         help='History size')
-    parser.add_argument('--prediction_size', type=int, default=50,
+    parser.add_argument('--prediction_size', type=int, default=75,
                         help='Prediction size')
-    parser.add_argument('--num_epochs', type=int, default=100,
+    parser.add_argument('--num_epochs', type=int, default=200,
                         help='Number of epochs')
-    parser.add_argument('--wandb_project', type=str, default='flowtime',
+    parser.add_argument('--nfe', type=int, default=20,
+                        help='Number of function evaluations')
+    parser.add_argument('--wandb_project', type=str, default='flowtime_ds',
                       help='W&B project name')
     return parser.parse_args()
 
 def main():
     args = parse_args()
     key = jrandom.PRNGKey(0)
-    wandb.init(project=args.wandb_project, config=vars(args), name=args.system)
+    wandb.init(project=args.wandb_project, config=vars(args), name=args.system+f"_{args.nfe}")
 
     # Set up configuration
     config = ModelConfig(
@@ -55,13 +57,13 @@ def main():
         t1=args.t1,
         n_train_test_samples=1024,
         batch_size=256,
+        n_steps_flow=args.nfe,
     )
 
     # Create system
     system = create_system(config.system, config.stochastic)
     (train_loader, train_trajectories), (test_loader, test_trajectories) = prepare_data(system, config, key)
 
-    key, key_ar, key_noar = jrandom.split(key, 3)
 
     # AR Model
     ar_model = ARFlow(
@@ -73,7 +75,7 @@ def main():
         hidden_blocks=config.hidden_blocks,
         n_rnn_layers=config.n_rnn_layers,
         rnn_hidden=config.rnn_hidden,
-        rngs=nnx.Rngs(key_ar)
+        rngs=nnx.Rngs(key)
     )
 
     # NoAR Model
@@ -85,7 +87,7 @@ def main():
         dim_hidden=config.hidden_dim,
         hidden_blocks=config.hidden_blocks,
         n_rnn_layers=config.n_rnn_layers,
-        rngs=nnx.Rngs(key_noar)
+        rngs=nnx.Rngs(key)
     )
 
     # Train NoAR model
@@ -116,38 +118,43 @@ def main():
         return crps, nrmse
 
     def evaluate_predictions(model, key, test_loader, nfe=50):
-        all_crps = []
-        all_nrmse = []
+        crps_pred = []
+        nrmse_pred = []
+        crps_exp = []
+        nrmse_exp = []
         
         for i, (history, covariates, true_future, true_exp) in enumerate(test_loader):
             predictions = sample_flow(model, key, history, covariates, 
                                     n_steps_flow=nfe, 
                                     n_steps_pred=config.prediction_size+config.extrapolation_size, 
                                     n_samples=50)
-            true_future = jnp.concatenate([true_future, true_exp], axis=1)
+            #true_future = jnp.concatenate([true_future, true_exp], axis=1)
             if isinstance(model, NoARFlow):
                 predictions = jnp.squeeze(predictions, axis=2)
-            crps, nrmse = evaluate_batch(predictions, true_future)
-            
-            all_crps.append(crps)
-            all_nrmse.append(nrmse)
+            crps_p, nrmse_p = evaluate_batch(predictions[:, :, :config.prediction_size], true_future)
+            crps_e, nrmse_e = evaluate_batch(predictions[:, :, config.prediction_size:], true_exp)
+            crps_pred.append(crps_p)
+            nrmse_pred.append(nrmse_p)
+            crps_exp.append(crps_e)
+            nrmse_exp.append(nrmse_e)
+
         
-        return jnp.mean(jnp.stack(all_crps)), jnp.mean(jnp.stack(all_nrmse))
+        return jnp.mean(jnp.stack(crps_pred)), jnp.mean(jnp.stack(nrmse_pred)), jnp.mean(jnp.stack(crps_exp)), jnp.mean(jnp.stack(nrmse_exp))
             
     print('Evaluating models...')
-    ar_crps, ar_nrmse = evaluate_predictions(ar_model, key_ar, test_loader)
-    noar_crps, noar_nrmse = evaluate_predictions(noar_model, key_noar, test_loader)
-    print(f'AR Model CRPS: {ar_crps}, NRMSE: {ar_nrmse}')
-    print(f'NoAR Model CRPS: {noar_crps}, NRMSE: {noar_nrmse}')
-    print('#'*50)
+    ar_crps_p, ar_nrmse_p, ar_crps_e, ar_nrmse_e = evaluate_predictions(ar_model, key, test_loader)
+    noar_crps, noar_nrmse, noar_crps_e, noar_nrmse_e = evaluate_predictions(noar_model, key, test_loader)
+    print(f'AR Model CRPS: {ar_crps_p}, NRMSE: {ar_nrmse_p}, CRPS Exp: {ar_crps_e}, NRMSE Exp: {ar_nrmse_e}')
+    print(f'NoAR Model CRPS: {noar_crps}, NRMSE: {noar_nrmse}, CRPS Exp: {noar_crps_e}, NRMSE Exp: {noar_nrmse_e}')
 
     ar_predictions, ar_history, ar_true = sample_trajectories(ar_model, key)
     noar_predictions, noar_history, noar_true = sample_trajectories(noar_model, key)
     noar_predictions = jnp.squeeze(noar_predictions, axis=2)
 
-    wandb.log({'ar_crps': ar_crps, 'ar_nrmse': ar_nrmse, 'noar_crps': noar_crps, 'noar_nrmse': noar_nrmse})
+    wandb.log({'AR/CRPS_P': ar_crps_p, 'AR/NRMSE_P': ar_nrmse_p, 'AR/CRPS_E': ar_crps_e, 'AR/NRMSE_E': ar_nrmse_e})
+    wandb.log({'NoAR/CRPS_P': noar_crps, 'NoAR/NRMSE_P': noar_nrmse, 'NoAR/CRPS_E': noar_crps_e, 'NoAR/NRMSE_E': noar_nrmse_e})
 
-    for i in range(5):
+    for i in range(10):
         plot_trajectories(config.ts, ar_history[i], ar_predictions[:,i], ar_true[i], config.extrapolation_size, title='AR Model Predictions', save_path=f'results/{config.system}/ar_predictions_{i}.pdf')
         plot_trajectories(config.ts, noar_history[i], noar_predictions[:,i], noar_true[i], config.extrapolation_size, title='NoAR Model Predictions', save_path=f'results/{config.system}/noar_predictions_{i}.pdf')
     return

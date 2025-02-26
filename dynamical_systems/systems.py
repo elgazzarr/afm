@@ -23,21 +23,18 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         params = jnp.array([1.3, 0.9, 0.8, 1.8])
         data_dim = 2
-        
+
+        initial_state = lambda key, n_samples: jrandom.uniform(key, (n_samples, data_dim), minval=0, maxval=5)
         if stochastic:
-            initial_state = lambda key, n_samples: jnp.repeat(
-                jnp.array((2.0, 1.0))[None, :], n_samples, axis=0)
             solver = dfx.EulerHeun()
         else:
-            initial_state = lambda key, n_samples: jrandom.uniform(
-                key, (n_samples, data_dim), minval=0, maxval=5)
             solver = dfx.Tsit5()
         
         system = DynamicalSystem(vector_field, params, data_dim, initial_state, solver, stochastic)
         
         if stochastic:
             # Environmental noise affecting both predator and prey
-            diffusion = lambda t, y, args: jnp.array((0.5, 0.5))
+            diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
             brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
@@ -57,20 +54,16 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         params = jnp.array([10.0, 28.0, 8/3])
         data_dim = 3
-        
+        initial_state = lambda key, n_samples: jrandom.uniform(key, (n_samples, data_dim), minval=0, maxval=10)
         if stochastic:
-            initial_state = lambda key, n_samples: jnp.repeat(
-                jnp.array((-6.557, -6.973, 24.059))[None, :], n_samples, axis=0)
             solver = dfx.EulerHeun()
         else:
-            initial_state = lambda key, n_samples: jrandom.uniform(
-                key, (n_samples, data_dim), minval=0, maxval=10)
             solver = dfx.Tsit5()
             
         system = DynamicalSystem(vector_field, params, data_dim, initial_state, solver, stochastic)
         
         if stochastic:
-            diffusion = lambda t, y, args: jnp.array((1.0, 1.0, 1.0))
+            diffusion = lambda t, y, args: jnp.array((1.5, 1.5, 1.5))
             brownian_motion = dfx.VirtualBrownianTree(0, 2, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field), 
@@ -100,8 +93,8 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         if stochastic:
             # Add noise primarily to the velocity component
-            diffusion = lambda t, y, args: jnp.array((0.4, 0.7))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-2, shape=(), key=jrandom.PRNGKey(0))
+            diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
+            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -131,8 +124,8 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         system = DynamicalSystem(vector_field, params, data_dim, initial_state, solver, stochastic)
         
         if stochastic:
-            diffusion = lambda t, y, args: jnp.array((0.5, 0.5))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-2, shape=(), key=jrandom.PRNGKey(0))
+            diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
+            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -162,7 +155,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         if stochastic:
             # Add noise to membrane potential and recovery variable
-            diffusion = lambda t, y, args: jnp.array((0.5, 0.5))
+            diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
             brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
@@ -219,7 +212,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         system = DynamicalSystem(vector_field, params, data_dim, initial_state, solver, stochastic)
         
         if stochastic:
-            diffusion = lambda t, y, args: jnp.array((0.5, 0.5))
+            diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
             brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),

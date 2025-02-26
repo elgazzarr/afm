@@ -10,19 +10,19 @@ class ModelConfig:
     t1: float = 20
     history_size: int = 50
     prediction_size: int = 30 
-    n_train_test_samples: int = 1024
-    batch_size: int = 64
+    n_train_test_samples: int = 2000
+    batch_size: int = 128
     
     # Model architecture
     covariates_dim: int = 1
     hidden_dim: int = 64
-    time_dim: int = 4
+    time_dim: int = 16
     hidden_blocks: int = 3
     rnn_hidden: int = 64
-    n_rnn_layers: int = 2
+    n_rnn_layers: int = 3
     
     # Training parameters
-    learning_rate: float = 3e-3
+    learning_rate: float = 1e-3
     
     # Flow prediction
     n_samples: int = 50

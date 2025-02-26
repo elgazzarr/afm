@@ -2,7 +2,6 @@
 from .embeddings import SinusodialPosEmb
 import flax.nnx as nnx
 import jax.numpy as jnp
-import jax
 import math
 from typing import Tuple
 

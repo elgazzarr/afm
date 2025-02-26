@@ -155,8 +155,8 @@ def prepare_data(system, config, key):
     extrapolation_size = config.extrapolation_size
     for i in range(2):  # Train and test
         key, subkey = jrandom.split(key)
-        n_samples = config.n_train_test_samples if i == 0 else int(0.25 * config.n_train_test_samples)
-        x0 = system.initial_state(subkey, config.n_train_test_samples)
+        n_samples = config.n_train_test_samples if i == 0 else int(0.2 * config.n_train_test_samples)
+        x0 = system.initial_state(subkey, n_samples)
         trajectories = jax.vmap(solve_single)(x0)
         
         # Split trajectories
@@ -165,7 +165,7 @@ def prepare_data(system, config, key):
         extrapolation = trajectories[:, config.history_size + config.prediction_size:, :]
         covariates = jnp.repeat(
             config.ts[None, :, None], 
-            config.n_train_test_samples, 
+            n_samples, 
             axis=0
         )
         
@@ -173,7 +173,7 @@ def prepare_data(system, config, key):
             jdl.ArrayDataset(history, covariates, prediction, extrapolation),
             'jax',
             batch_size=config.batch_size,
-            shuffle=True
+            shuffle=False
         )
         dataloaders.append((dataloader, trajectories))
     
