@@ -16,23 +16,25 @@ import jax.numpy as jnp
 from orbax.checkpoint import PyTreeCheckpointer
 from data.gluonts_loaders import get_dataset_loader, _to_dataframe
 import argparse
+import warnings
+warnings.filterwarnings("ignore")
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Flow Matching for Time Series')
     
     # Dataset parameters
-    parser.add_argument('--dataset_name', type=str, default='traffic_nips',
-                      help='Name of the dataset')
+    parser.add_argument('--dataset_name', type=str, default='exchange_rate_nips',
+                      help='Name of the dataset', choices=['traffic_nips', 'electricity_nips', 'solar_nips', 'exchange_rate_nips', 'wiki-rolling_nips'])
     parser.add_argument('--context_ratio', type=float, default=2.0,
                       help='Context ratio for dataset')
-    # Training parameters
     parser.add_argument('--seed', type=int, default=1,
                       help='Random seed')
     parser.add_argument('--batch_size', type=int, default=128,
                       help='Batch size')
     parser.add_argument('--training_steps', type=int, default=1000,
                       help='Number of training steps')
-    parser.add_argument('--learning_rate', type=float, default=5e-3,
+    parser.add_argument('--learning_rate', type=float, default=1e-3,
                       help='Learning rate')
     parser.add_argument('--patience', type=int, default=10,
                       help='Patience for early stopping')
@@ -41,7 +43,7 @@ def parse_args():
     # Model architecture (Flow)
     parser.add_argument('--h_dim', type=int, default=128,
                       help='Hidden dimension of the RNN')
-    parser.add_argument('--t_dim', type=int, default=32,
+    parser.add_argument('--t_dim', type=int, default=64,
                       help='Time dimension')
     parser.add_argument('--n_rnn_layers', type=int, default=3,
                       help='Number of RNN layers')
@@ -53,19 +55,21 @@ def parse_args():
                       help='Number of residual channels')
     parser.add_argument('--residual_hidden', type=int, default=64,
                       help='Residual hidden dimension'),
+    parser.add_argument('--data_scaling', type=bool, default=False,
+                        help='Whether to mean scale data')
     parser.add_argument('--context_scaling', type=bool, default=True,
                         help='Whether to mean scale context')
     
     # Inference parameters
     parser.add_argument('--mcmc_samples', type=int, default=100,
                       help='Number of MCMC samples')
-    parser.add_argument('--nfe', type=int, default=30,
+    parser.add_argument('--nfe', type=int, default=100,
                       help='Number of function evaluations') 
     
     # Logging parameters
     parser.add_argument('--wandb_project', type=str, default='flowtime',
                       help='W&B project name')
-    parser.add_argument('--log_interval', type=int, default=500,
+    parser.add_argument('--log_interval', type=int, default=200,
                       help='Logging interval')
     parser.add_argument('--save_model', action='store_true',
                       help='Whether to save model checkpoints')
@@ -93,7 +97,7 @@ def main():
         config.dataset_name, 
         config.batch_size, 
         config.context_ratio,
-        scale=True
+        scale=args.data_scaling
     )
     
         

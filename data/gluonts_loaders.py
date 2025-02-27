@@ -58,62 +58,81 @@ def batchify(data: List[dict]) -> dict:
         for key in data[0].keys()
     }
 
-def create_date_embeddings(start_date_str, n_timepoints):
+def create_date_embeddings(start_date_str, n_timepoints, freq):
     # Convert string to datetime if needed
     if isinstance(start_date_str, str):
         start_date = pd.to_datetime(start_date_str)
     else:
         start_date = start_date_str
-    
-    # Create array of sequential timestamps - using hours now
-    timestamps = [start_date + pd.Timedelta(hours=i) 
-                 for i in range(n_timepoints)]
-    
+
+    # Convert Period to Timestamp (Fix for the ValueError)
+    if isinstance(start_date, pd.Period):
+        start_date = start_date.to_timestamp()
+
+    # Generate timestamps based on frequency
+    if freq == "H":
+        timestamps = pd.date_range(start=start_date, periods=n_timepoints, freq="H")
+    elif freq == "D":
+        timestamps = pd.date_range(start=start_date, periods=n_timepoints, freq="D")
+    elif freq == "B":
+        timestamps = pd.date_range(start=start_date, periods=n_timepoints, freq="B")
+    else:
+        raise ValueError("Unsupported frequency. Use 'H', 'D', or 'B'.")
+
     # Initialize arrays for each feature
-    hour_sin = np.zeros(n_timepoints)
-    hour_cos = np.zeros(n_timepoints)
     day_sin = np.zeros(n_timepoints)
     day_cos = np.zeros(n_timepoints)
     month_sin = np.zeros(n_timepoints)
     month_cos = np.zeros(n_timepoints)
+    year_sin = np.zeros(n_timepoints)
+    year_cos = np.zeros(n_timepoints)
+
+    if freq == "H":
+        hour_sin = np.zeros(n_timepoints)
+        hour_cos = np.zeros(n_timepoints)
     
     # Fill arrays with embeddings for each timestamp
     for i, ts in enumerate(timestamps):
-        hour_sin[i] = np.sin(2 * np.pi * ts.hour / 24.0)
-        hour_cos[i] = np.cos(2 * np.pi * ts.hour / 24.0)
+        if freq == "H":
+            hour_sin[i] = np.sin(2 * np.pi * ts.hour / 24.0)
+            hour_cos[i] = np.cos(2 * np.pi * ts.hour / 24.0)
+
         day_sin[i] = np.sin(2 * np.pi * ts.dayofweek / 7.0)
         day_cos[i] = np.cos(2 * np.pi * ts.dayofweek / 7.0)
         month_sin[i] = np.sin(2 * np.pi * (ts.month - 1) / 12.0)
         month_cos[i] = np.cos(2 * np.pi * (ts.month - 1) / 12.0)
-    
-    # Stack all features
-    return np.stack([hour_sin, hour_cos, day_sin, day_cos, month_sin, month_cos])
+        year_sin[i] = np.sin(2 * np.pi * (ts.dayofyear - 1) / 365.0)
+        year_cos[i] = np.cos(2 * np.pi * (ts.dayofyear - 1) / 365.0)
 
+    # Stack all features (include hour features only for hourly frequency)
+    if freq == "H":
+        return np.stack([hour_sin, hour_cos, day_sin, day_cos, month_sin, month_cos, year_sin, year_cos])
+    else:
+        return np.stack([day_sin, day_cos, month_sin, month_cos, year_sin, year_cos])
 
-def add_temporal_covariates(dataset: Iterable[dict]) -> Iterable[dict]:
+def add_temporal_covariates(dataset: Iterable[dict], freq) -> Iterable[dict]:
     for item in dataset:
         n_timepoints = item['target'].shape[1]
-        date_covariates = create_date_embeddings(item['start'], n_timepoints)
+        date_covariates = create_date_embeddings(item['start'], n_timepoints, freq=freq)
         item['time_feat'] = date_covariates
+
     return dataset
 
 
 def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int, scale=False) -> Tuple[GluonTSDataLoaderAdapter, GluonTSDataLoaderAdapter, Any, dict, SimpleTransformation]:
 
     dataset = get_dataset(dataset_name, regenerate=False)
+    dataset_freq = dataset.metadata.freq
     prediction_length = dataset.metadata.prediction_length
     context_length = prediction_length * context_ratio
-    freq = dataset.metadata.freq
-    input_names = ["past_target"]
-    required_fields = ["forecast_start", "past_time_feat", "future_time_feat"]
 
     train_grouper = MultivariateGrouper(max_target_dim=min(2000, int(dataset.metadata.feat_static_cat[0].cardinality)))
 
     test_grouper = MultivariateGrouper(num_test_dates=int(len(dataset.test)/len(dataset.train)), 
                                     max_target_dim=min(2000, int(dataset.metadata.feat_static_cat[0].cardinality)))
     
-    dataset_train = add_temporal_covariates(train_grouper(dataset.train))
-    dataset_test = add_temporal_covariates(test_grouper(dataset.test))
+    dataset_train = add_temporal_covariates(train_grouper(dataset.train), dataset_freq)
+    dataset_test = add_temporal_covariates(test_grouper(dataset.test), dataset_freq)
 
     TOTAL_LEN = dataset_train[0]['target'].shape[1]
     VAL_START = TOTAL_LEN - prediction_length - context_length
@@ -122,7 +141,6 @@ def get_dataset_loader(dataset_name: str, batch_size: int, context_ratio: int, s
     scaler = StandardScaler(field_name=FieldName.TARGET) if scale else NothingScaler()
     scaler.fit(dataset_train)
     dataset_train = [scaler.transform(entry.copy()) for entry in dataset_train]
-    #dataset_test = [scaler.transform(entry.copy()) for entry in dataset_test]
     
     train_transform = Chain([
         AddObservedValuesIndicator(

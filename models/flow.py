@@ -78,16 +78,12 @@ class Flow(nnx.Module):
             dt = 1/n_steps_flow
 
             context_scaler = self.context_scaler
-            scaled_history, scale = context_scaler.fit_transform(history)
-            context_length = scaled_history.shape[0]
-            
-            # 2. Maintain separate buffers
-            current_scaled = scaled_history  # For model inputs
-            current_original = history       # For final predictions
+            context_length = history.shape[0]
+            current_context = history
             predictions = []
             
             for _ in range(n_steps_pred):
-                context_scaled = current_scaled[-context_length:]
+                context_scaled, scale = context_scaler.fit_transform(current_context[-context_length:])
                 x0 = self.p0(key, (self.dim_x,))
                 x_next_scaled = dfx.diffeqsolve(
                     term,
@@ -98,12 +94,9 @@ class Flow(nnx.Module):
                     args=(context_scaled, covariates),
                     saveat=dfx.SaveAt(t1=True)
                 ).ys
-                # 5. Inverse transform prediction
                 x_next = context_scaler.inverse_transform(x_next_scaled, scale)
                 predictions.append(x_next)
-                # 6. Update buffers
-                current_original = jnp.concatenate([current_original, x_next], axis=0)
-                current_scaled = jnp.concatenate([current_scaled,  context_scaler.transform(x_next, scale)], axis=0)
+                current_context = jnp.concatenate([current_context, x_next], axis=0)
             
 
             return jnp.vstack(predictions)

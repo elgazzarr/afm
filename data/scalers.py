@@ -10,38 +10,22 @@ from typing import Tuple
 import jax.numpy as jnp
 
 class ContextScaler:
-    def __init__(self, minimum_scale: float = 1e-10):
-        self.minimum_scale = minimum_scale
-
     def fit_transform(self, context: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        """
-        Compute scale based on context and transform the data.
-        
-        Args:
-            context: Input array of shape (time, features)
-            
-        Returns:
-            Tuple of (scaled_context, scale)
-        """
-        # Compute mean of absolute values along time dimension
-        scale = jnp.mean(jnp.abs(context), axis=0, keepdims=True)  # (1, features)
-        
-        # Handle zero scale case
-        scale = jnp.maximum(scale, self.minimum_scale)
-        
+        # context is (time, features)
+        scale = jnp.mean(context, axis=0, keepdims=True)  # (1, features) 
+        scale = jnp.where(scale == 0, 1.0, scale)
         return context / scale, scale
-
+    
     def transform(self, x: jnp.ndarray, scale: jnp.ndarray) -> jnp.ndarray:
-        """Transform data using pre-computed scale."""
         return x / scale
-
+    
     def transform_features(self, x: jnp.ndarray, scale: jnp.ndarray) -> jnp.ndarray:
-        """Transform feature vector using scale."""
-        return x / scale[0]
-
+        # x is (features,)
+        return x / scale[0, 0]
+    
     def inverse_transform(self, x: jnp.ndarray, scale: jnp.ndarray) -> jnp.ndarray:
-        """Inverse transform scaled data."""
         return x * scale
+    
     
 class NoContextScaler:
     def __init__(self, minimum_scale: float = 1e-10):
