@@ -22,3 +22,6 @@ Thumbs.db
 wandb/
 *.pyc
 outputs/
+
+dynamical_systems/results/
+dynamical_systems/wandb/
