@@ -7,14 +7,14 @@ import jax.random as jrandom
 import flax.nnx as nnx
 
 from ..models import FlowMatching
-from ..config import ModelConfig
+from ..config_loader import Config
 from .metrics import compute_crps, compute_nrmse
 
 
 class ModelEvaluator:
     """Systematic model evaluation for AFM vs FM comparison."""
     
-    def __init__(self, config: ModelConfig, nfe: int = 50):
+    def __init__(self, config: Config, nfe: int = 50):
         """Initialize evaluator.
         
         Args:
@@ -81,7 +81,7 @@ class ModelEvaluator:
                 covariates,
                 n_steps_flow=self.nfe,
                 n_steps_pred=(
-                    self.config.prediction_size + 
+                    self.config.data_prediction_size + 
                     self.config.extrapolation_size
                 ),
                 n_samples=n_samples
@@ -92,8 +92,8 @@ class ModelEvaluator:
                 predictions = jnp.squeeze(predictions, axis=2)
             
             # Split predictions into forecast and extrapolation
-            pred_forecast = predictions[:, :, :self.config.prediction_size]
-            pred_extrapolation = predictions[:, :, self.config.prediction_size:]
+            pred_forecast = predictions[:, :, :self.config.data_prediction_size]
+            pred_extrapolation = predictions[:, :, self.config.data_prediction_size:]
             
             # Evaluate forecast performance
             crps_p, nrmse_p = self.evaluate_batch(pred_forecast, true_future)

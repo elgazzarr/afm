@@ -1,0 +1,45 @@
+# Van der Pol System Study Configuration
+
+# System Configuration
+system:
+  name: vanderpol          # Different system
+  stochastic: false        # Deterministic for this study
+  num_timepoints: 150
+  t0: 0.0
+  t1: 30.0
+  
+# Data Configuration  
+data:
+  history_size: 60
+  prediction_size: 40
+  n_train_test_samples: 1024
+  batch_size: 128
+
+# Model Architecture
+model:
+  covariates_dim: 1
+  hidden_dim: 96
+  time_dim: 24
+  hidden_blocks: 4
+  rnn_hidden: 96
+  n_rnn_layers: 3
+
+# Training Configuration
+training:
+  learning_rate: 0.001
+  num_epochs: 300
+
+# Flow Matching Configuration  
+flow:
+  n_samples: 75
+  n_steps_flow: 75
+  nfe: 25
+
+# Experiment Configuration
+experiment:
+  name: "vanderpol_deterministic_study"
+  wandb_project: "flowtime_vanderpol"
+  save_figures: true
+  results_dir: "vanderpol_results"
+  seed: 123
+  num_eval_samples: 50

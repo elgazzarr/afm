@@ -7,7 +7,8 @@ import jax.random as jrandom
 import flax.nnx as nnx
 from pathlib import Path
 
-from .base_experiment import BaseExperiment, ExperimentConfig
+from .base_experiment import BaseExperiment
+from ..config_loader import Config
 from ..models import AutoregressiveFlowMatching, FlowMatching
 from ..training.data_preparation import prepare_data
 from ..training.trainers import AFMTrainer, FMTrainer
@@ -18,14 +19,14 @@ from ..utils.visualization import plot_trajectories
 class AFMvsFMComparison(BaseExperiment):
     """Experiment comparing Autoregressive Flow Matching vs Flow Matching."""
     
-    def __init__(self, config: ExperimentConfig, seed: int = 0):
+    def __init__(self, config: Config, seed: int = 0):
         """Initialize AFM vs FM comparison experiment."""
         super().__init__(config, seed)
-        self.evaluator = ModelEvaluator(config.model_config, config.nfe)
+        self.evaluator = ModelEvaluator(config, config.flow_nfe)
     
     def prepare_data(self) -> Tuple[Any, Any]:
         """Prepare training and test data loaders."""
-        return prepare_data(self.system, self.config.model_config, self.key)
+        return prepare_data(self.system, self.config, self.key)
     
     def create_models(self) -> Dict[str, Any]:
         """Create AFM and FM models."""
@@ -34,25 +35,25 @@ class AFMvsFMComparison(BaseExperiment):
         # AFM Model
         afm_model = AutoregressiveFlowMatching(
             dim_x=self.system.data_dim,
-            dim_c=self.config.model_config.covariates_dim,
-            dim_h=self.config.model_config.hidden_dim,
-            dim_t=self.config.model_config.time_dim,
-            dim_hidden=self.config.model_config.hidden_dim,
-            hidden_blocks=self.config.model_config.hidden_blocks,
-            n_rnn_layers=self.config.model_config.n_rnn_layers,
-            rnn_hidden=self.config.model_config.rnn_hidden,
+            dim_c=self.config.model_covariates_dim,
+            dim_h=self.config.model_hidden_dim,
+            dim_t=self.config.model_time_dim,
+            dim_hidden=self.config.model_hidden_dim,
+            hidden_blocks=self.config.model_hidden_blocks,
+            n_rnn_layers=self.config.model_n_rnn_layers,
+            rnn_hidden=self.config.model_rnn_hidden,
             rngs=nnx.Rngs(afm_key)
         )
         
         # FM Model  
         fm_model = FlowMatching(
             dim_x=self.system.data_dim,
-            dim_c=self.config.model_config.covariates_dim,
-            dim_h=self.config.model_config.hidden_dim,
-            dim_t=self.config.model_config.time_dim,
-            dim_hidden=self.config.model_config.hidden_dim,
-            hidden_blocks=self.config.model_config.hidden_blocks,
-            n_rnn_layers=self.config.model_config.n_rnn_layers,
+            dim_c=self.config.model_covariates_dim,
+            dim_h=self.config.model_hidden_dim,
+            dim_t=self.config.model_time_dim,
+            dim_hidden=self.config.model_hidden_dim,
+            hidden_blocks=self.config.model_hidden_blocks,
+            n_rnn_layers=self.config.model_n_rnn_layers,
             rngs=nnx.Rngs(fm_key)
         )
         
@@ -75,20 +76,20 @@ class AFMvsFMComparison(BaseExperiment):
         print('Training AFM Model...')
         afm_trainer = AFMTrainer(
             models['AFM'], 
-            learning_rate=self.config.model_config.learning_rate
+            learning_rate=self.config.training_learning_rate
         )
-        afm_trainer.train(train_loader, test_loader, num_epochs=self.config.num_epochs)
+        afm_trainer.train(train_loader, test_loader, num_epochs=self.config.training_num_epochs)
         
         # Train FM model (typically needs more epochs)
         print('Training FM Model...')
         fm_trainer = FMTrainer(
             models['FM'],
-            learning_rate=self.config.model_config.learning_rate
+            learning_rate=self.config.training_learning_rate
         )
         fm_trainer.train(
             train_loader, 
             test_loader, 
-            num_epochs=self.config.num_epochs * 2
+            num_epochs=self.config.training_num_epochs * 2
         )
         
         print('Training complete!')
@@ -119,7 +120,7 @@ class AFMvsFMComparison(BaseExperiment):
     
     def save_visualizations(self, models: Dict[str, Any], test_data: Any) -> None:
         """Save trajectory prediction visualizations."""
-        if not self.config.save_figures:
+        if not self.config.experiment_save_figures:
             return
             
         test_loader = test_data
@@ -144,11 +145,11 @@ class AFMvsFMComparison(BaseExperiment):
                 save_path = results_path / model_name / filename
                 
                 plot_trajectories(
-                    self.config.model_config.ts,
+                    self.config.ts,
                     history[i],
                     predictions[:, i], 
                     true_future[i],
-                    self.config.model_config.extrapolation_size,
+                    self.config.extrapolation_size,
                     title=f'{model_name} Model Predictions',
                     save_path=str(save_path)
                 )
@@ -168,12 +169,12 @@ class AFMvsFMComparison(BaseExperiment):
             self.key, 
             history, 
             covariates,
-            n_steps_flow=self.config.nfe,
+            n_steps_flow=self.config.flow_nfe,
             n_steps_pred=(
-                self.config.model_config.prediction_size + 
-                self.config.model_config.extrapolation_size
+                self.config.data_prediction_size + 
+                self.config.extrapolation_size
             ),
-            n_samples=self.config.num_eval_samples
+            n_samples=self.config.experiment_num_eval_samples
         )
         
         # Handle different model output shapes

@@ -1,0 +1,45 @@
+# Unified Configuration for Dynamical Systems Flow Matching Experiments
+
+# System Configuration
+system:
+  name: lorenz                    # Which dynamical system (lorenz, lotka_volterra, vanderpol, harmonic_oscillator, brusselator, fitzhugh_nagumo, duffing)
+  stochastic: true               # Whether system is stochastic
+  num_timepoints: 100            # Total timepoints in trajectory
+  t0: 0.0                        # Start time
+  t1: 20.0                       # End time
+  
+# Data Configuration  
+data:
+  history_size: 50              # Points for conditioning
+  prediction_size: 30           # Points to predict
+  n_train_test_samples: 512     # Number of trajectories
+  batch_size: 128               # Training batch size
+
+# Model Architecture
+model:
+  covariates_dim: 1             # Input dimension
+  hidden_dim: 64                # Hidden layer size
+  time_dim: 16                  # Time embedding dimension
+  hidden_blocks: 3              # Number of flow blocks
+  rnn_hidden: 64                # RNN hidden size
+  n_rnn_layers: 3               # Number of RNN layers
+
+# Training Configuration
+training:
+  learning_rate: 0.001          # Learning rate
+  num_epochs: 200               # Training epochs
+
+# Flow Matching Configuration  
+flow:
+  n_samples: 50                 # Samples for evaluation
+  n_steps_flow: 50              # NFE for sampling
+  nfe: 20                       # Alternative NFE parameter
+
+# Experiment Configuration
+experiment:
+  name: "afm_vs_fm_comparison"  # Experiment name
+  wandb_project: "flowtime_ds"  # W&B project
+  save_figures: true            # Save result plots
+  results_dir: "results"        # Output directory
+  seed: 0                       # Random seed
+  num_eval_samples: 50          # Number of evaluation samples

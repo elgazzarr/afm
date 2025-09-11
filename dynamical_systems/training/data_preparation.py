@@ -8,12 +8,12 @@ import jax_dataloader as jdl
 import diffrax as dfx
 
 from ..systems.systems import DynamicalSystem
-from ..config import ModelConfig
+from ..config_loader import Config
 
 
 def prepare_trajectories(
     system: DynamicalSystem, 
-    config: ModelConfig, 
+    config: Config, 
     key: jax.random.PRNGKey
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Generate trajectory data for train and test sets.
@@ -46,8 +46,8 @@ def prepare_trajectories(
         
         # Determine number of samples
         n_samples = (
-            config.n_train_test_samples if i == 0 
-            else int(0.2 * config.n_train_test_samples)
+            config.data_n_train_test_samples if i == 0 
+            else int(0.2 * config.data_n_train_test_samples)
         )
         
         # Generate initial conditions and solve trajectories
@@ -56,7 +56,7 @@ def prepare_trajectories(
         trajectories.append(traj)
     
     # Create covariate information (time stamps) for all time points
-    total_time_points = config.history_size + config.prediction_size + config.extrapolation_size
+    total_time_points = config.data_history_size + config.data_prediction_size + config.extrapolation_size
     relevant_ts = config.ts[:total_time_points]
     
     return trajectories[0], trajectories[1], relevant_ts
@@ -66,7 +66,7 @@ def create_dataloaders(
     train_trajectories: jnp.ndarray,
     test_trajectories: jnp.ndarray, 
     covariates: jnp.ndarray,
-    config: ModelConfig
+    config: Config
 ) -> Tuple[Any, Any]:
     """Create train and test dataloaders from trajectory data.
     
@@ -86,11 +86,11 @@ def create_dataloaders(
         n_samples = trajectories.shape[0]
         
         # Split trajectories into history, prediction, and extrapolation
-        history = trajectories[:, :config.history_size, :]
+        history = trajectories[:, :config.data_history_size, :]
         prediction = trajectories[:, 
-            config.history_size:config.history_size + config.prediction_size, :]
+            config.data_history_size:config.data_history_size + config.data_prediction_size, :]
         extrapolation = trajectories[:, 
-            config.history_size + config.prediction_size:, :]
+            config.data_history_size + config.data_prediction_size:, :]
         
         # Expand covariates to match sample count
         sample_covariates = jnp.repeat(
@@ -103,7 +103,7 @@ def create_dataloaders(
         dataloader = jdl.DataLoader(
             jdl.ArrayDataset(history, sample_covariates, prediction, extrapolation),
             'jax',
-            batch_size=config.batch_size,
+            batch_size=config.data_batch_size,
             shuffle=(i == 0)  # Only shuffle training data
         )
         
@@ -114,7 +114,7 @@ def create_dataloaders(
 
 def prepare_data(
     system: DynamicalSystem, 
-    config: ModelConfig, 
+    config: Config, 
     key: jax.random.PRNGKey
 ) -> Tuple[Any, Any]:
     """Prepare train and test dataloaders for flow matching models.
@@ -137,7 +137,7 @@ def prepare_data(
 
 def create_data_splits(
     trajectories: jnp.ndarray,
-    config: ModelConfig
+    config: Config
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Split trajectories into history, prediction, and extrapolation segments.
     
@@ -148,10 +148,10 @@ def create_data_splits(
     Returns:
         Tuple of (history, prediction, extrapolation) arrays
     """
-    history = trajectories[:, :config.history_size, :]
+    history = trajectories[:, :config.data_history_size, :]
     prediction = trajectories[:, 
-        config.history_size:config.history_size + config.prediction_size, :]
+        config.data_history_size:config.data_history_size + config.data_prediction_size, :]
     extrapolation = trajectories[:, 
-        config.history_size + config.prediction_size:, :]
+        config.data_history_size + config.data_prediction_size:, :]
     
     return history, prediction, extrapolation

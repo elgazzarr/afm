@@ -9,61 +9,18 @@ import wandb
 import os
 from pathlib import Path
 
-from ..config import ModelConfig
+from ..config_loader import Config
 from ..systems.systems import DynamicalSystem, create_system
 
 
-@dataclass 
-class ExperimentConfig:
-    """Configuration for experiments.
-    
-    Extends ModelConfig with experiment-specific parameters.
-    """
-    # Experiment settings
-    experiment_name: str = "afm_vs_fm_comparison"
-    wandb_project: str = "flowtime_ds"
-    num_epochs: int = 200
-    nfe: int = 20  # Number of function evaluations
-    num_eval_samples: int = 50
-    save_figures: bool = True
-    results_dir: str = "results"
-    
-    # Model configuration
-    model_config: Optional[ModelConfig] = None
-    
-    def __post_init__(self):
-        """Initialize model config if not provided."""
-        if self.model_config is None:
-            self.model_config = ModelConfig()
-    
-    @classmethod
-    def from_args(cls, args) -> 'ExperimentConfig':
-        """Create ExperimentConfig from command line arguments."""
-        model_config = ModelConfig(
-            system=args.system,
-            num_timepoints=args.num_timepoints,
-            history_size=args.history_size,
-            prediction_size=args.prediction_size,
-            t0=0.0,
-            t1=args.t1,
-            n_train_test_samples=1024,
-            batch_size=256,
-            n_steps_flow=args.nfe,
-        )
-        
-        return cls(
-            experiment_name=f"{args.system}_{args.nfe}",
-            wandb_project=args.wandb_project,
-            num_epochs=args.num_epochs,
-            nfe=args.nfe,
-            model_config=model_config
-        )
+# Alias for backward compatibility
+ExperimentConfig = Config
 
 
 class BaseExperiment(ABC):
     """Base class for flow matching experiments."""
     
-    def __init__(self, config: ExperimentConfig, seed: int = 0):
+    def __init__(self, config: Config, seed: int = 0):
         """Initialize experiment.
         
         Args:
@@ -76,8 +33,8 @@ class BaseExperiment(ABC):
         
         # Initialize system
         self.system = create_system(
-            config.model_config.system, 
-            config.model_config.stochastic
+            config.system_name, 
+            config.system_stochastic
         )
         
         # Results storage
@@ -89,44 +46,45 @@ class BaseExperiment(ABC):
         config_dict = {
             # Experiment config
             'experiment_name': self.config.experiment_name,
-            'wandb_project': self.config.wandb_project,
-            'num_epochs': self.config.num_epochs,
-            'nfe': self.config.nfe,
-            'num_eval_samples': self.config.num_eval_samples,
-            'save_figures': self.config.save_figures,
-            'results_dir': self.config.results_dir,
-            # Model config (excluding JAX arrays)
-            'num_timepoints': self.config.model_config.num_timepoints,
-            't0': self.config.model_config.t0,
-            't1': self.config.model_config.t1,
-            'history_size': self.config.model_config.history_size,
-            'prediction_size': self.config.model_config.prediction_size,
-            'n_train_test_samples': self.config.model_config.n_train_test_samples,
-            'batch_size': self.config.model_config.batch_size,
-            'covariates_dim': self.config.model_config.covariates_dim,
-            'hidden_dim': self.config.model_config.hidden_dim,
-            'time_dim': self.config.model_config.time_dim,
-            'hidden_blocks': self.config.model_config.hidden_blocks,
-            'rnn_hidden': self.config.model_config.rnn_hidden,
-            'n_rnn_layers': self.config.model_config.n_rnn_layers,
-            'learning_rate': self.config.model_config.learning_rate,
-            'n_samples': self.config.model_config.n_samples,
-            'n_steps_flow': self.config.model_config.n_steps_flow,
-            'system': self.config.model_config.system,
-            'stochastic': self.config.model_config.stochastic,
-            'extrapolation_size': self.config.model_config.extrapolation_size,
-            'dt': float(self.config.model_config.dt),
+            'wandb_project': self.config.experiment_wandb_project,
+            'num_epochs': self.config.training_num_epochs,
+            'nfe': self.config.flow_nfe,
+            'num_eval_samples': self.config.experiment_num_eval_samples,
+            'save_figures': self.config.experiment_save_figures,
+            'results_dir': self.config.experiment_results_dir,
+            # System and data config
+            'num_timepoints': self.config.system_num_timepoints,
+            't0': self.config.system_t0,
+            't1': self.config.system_t1,
+            'history_size': self.config.data_history_size,
+            'prediction_size': self.config.data_prediction_size,
+            'n_train_test_samples': self.config.data_n_train_test_samples,
+            'batch_size': self.config.data_batch_size,
+            # Model config
+            'covariates_dim': self.config.model_covariates_dim,
+            'hidden_dim': self.config.model_hidden_dim,
+            'time_dim': self.config.model_time_dim,
+            'hidden_blocks': self.config.model_hidden_blocks,
+            'rnn_hidden': self.config.model_rnn_hidden,
+            'n_rnn_layers': self.config.model_n_rnn_layers,
+            'learning_rate': self.config.training_learning_rate,
+            'n_samples': self.config.flow_n_samples,
+            'n_steps_flow': self.config.flow_n_steps_flow,
+            'system': self.config.system_name,
+            'stochastic': self.config.system_stochastic,
+            'extrapolation_size': self.config.extrapolation_size,
+            'dt': float(self.config.dt),
         }
         
         wandb.init(
-            project=self.config.wandb_project,
+            project=self.config.experiment_wandb_project,
             config=config_dict,
             name=self.config.experiment_name
         )
     
     def create_results_directory(self) -> Path:
         """Create results directory for experiment outputs."""
-        results_path = Path(self.config.results_dir) / self.config.model_config.system
+        results_path = Path(self.config.experiment_results_dir) / self.config.system_name
         results_path.mkdir(parents=True, exist_ok=True)
         return results_path
     
@@ -192,7 +150,7 @@ class BaseExperiment(ABC):
             models: Dictionary of trained models  
             test_data: Test data for plotting
         """
-        if not self.config.save_figures:
+        if not self.config.experiment_save_figures:
             return
             
         results_path = self.create_results_directory()
