@@ -55,8 +55,7 @@ model:
 # Training Configuration
 training:
   learning_rate: 0.001
-  num_epochs_afm: 200
-  num_epochs_fm: 400
+  num_epochs: 200                 # Number of training epochs
   early_stopping: true
   patience: 20
 

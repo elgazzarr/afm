@@ -125,7 +125,7 @@ class BaseExperiment(ABC):
             config_dict['sweep_params'] = getattr(self.config, 'sweep_params')
         
         # Add custom wandb settings from config
-        wandb_config = getattr(self.config, 'wandb', {})
+        wandb_config = getattr(self.config, 'wandb', {}) or {} or {}
         custom_group = wandb_config.get('group', group_name)
         custom_tags = wandb_config.get('tags', [])
         notes = wandb_config.get('notes', getattr(self.config, 'experiment_description', ''))
@@ -204,7 +204,7 @@ class BaseExperiment(ABC):
             wandb.log(wandb_metrics)
         
         # Save results as wandb artifact if enabled
-        wandb_config = getattr(self.config, 'wandb', {})
+        wandb_config = getattr(self.config, 'wandb', {}) or {}
         save_artifacts = wandb_config.get('save_artifacts', True)
         
         if save_artifacts and wandb.run is not None:
@@ -356,7 +356,7 @@ class BaseExperiment(ABC):
         Args:
             models: Dictionary of trained models
         """
-        wandb_config = getattr(self.config, 'wandb', {})
+        wandb_config = getattr(self.config, 'wandb', {}) or {}
         save_models = wandb_config.get('save_models', False)
         
         if not save_models or wandb.run is None:

@@ -74,9 +74,10 @@ class ModelEvaluator:
             true_future = prediction
             true_exp = extrapolation
             
-            # Generate predictions
+            # Generate predictions with fresh key for each batch
+            key, sample_key = jrandom.split(key)
             predictions = model.sample(
-                key, 
+                sample_key, 
                 history, 
                 covariates,
                 nfe=self.nfe,

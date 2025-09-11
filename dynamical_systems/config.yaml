@@ -32,8 +32,7 @@ training:
 # Flow Matching Configuration  
 flow:
   n_samples: 50                 # Samples for evaluation
-  n_steps_flow: 50              # NFE for sampling
-  nfe: 20                       # Alternative NFE parameter
+  nfe: 20                       # Number of function evaluations for sampling
 
 # Experiment Configuration
 experiment:

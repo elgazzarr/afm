@@ -1,0 +1,110 @@
+{
+  "nfe_1": {
+    "AFM": {
+      "crps_prediction": 0.14536291360855103,
+      "nrmse_prediction": 0.035667452961206436,
+      "crps_extrapolation": 0.23317851126194,
+      "nrmse_extrapolation": 0.09647093713283539
+    },
+    "FM": {
+      "crps_prediction": 0.16399820148944855,
+      "nrmse_prediction": 0.2314111888408661,
+      "crps_extrapolation": 0.1297069638967514,
+      "nrmse_extrapolation": 0.2525020241737366
+    },
+    "timing": {
+      "inference_time": 14.215121984481812,
+      "nfe": 1
+    }
+  },
+  "nfe_5": {
+    "AFM": {
+      "crps_prediction": 0.1260007917881012,
+      "nrmse_prediction": 0.04066568985581398,
+      "crps_extrapolation": 0.21319137513637543,
+      "nrmse_extrapolation": 0.10522940754890442
+    },
+    "FM": {
+      "crps_prediction": 0.16969797015190125,
+      "nrmse_prediction": 0.22827811539173126,
+      "crps_extrapolation": 0.1361650675535202,
+      "nrmse_extrapolation": 0.264734148979187
+    },
+    "timing": {
+      "inference_time": 15.261393785476685,
+      "nfe": 5
+    }
+  },
+  "nfe_20": {
+    "AFM": {
+      "crps_prediction": 0.12235730141401291,
+      "nrmse_prediction": 0.042263712733983994,
+      "crps_extrapolation": 0.20153605937957764,
+      "nrmse_extrapolation": 0.10683786869049072
+    },
+    "FM": {
+      "crps_prediction": 0.1660730540752411,
+      "nrmse_prediction": 0.2268238067626953,
+      "crps_extrapolation": 0.13520042598247528,
+      "nrmse_extrapolation": 0.25675952434539795
+    },
+    "timing": {
+      "inference_time": 26.143223762512207,
+      "nfe": 20
+    }
+  },
+  "nfe_50": {
+    "AFM": {
+      "crps_prediction": 0.11936169117689133,
+      "nrmse_prediction": 0.04036042466759682,
+      "crps_extrapolation": 0.19989077746868134,
+      "nrmse_extrapolation": 0.10349410027265549
+    },
+    "FM": {
+      "crps_prediction": 0.16426093876361847,
+      "nrmse_prediction": 0.22669149935245514,
+      "crps_extrapolation": 0.1310398429632187,
+      "nrmse_extrapolation": 0.2628917694091797
+    },
+    "timing": {
+      "inference_time": 36.254287242889404,
+      "nfe": 50
+    }
+  },
+  "nfe_75": {
+    "AFM": {
+      "crps_prediction": 0.1152716726064682,
+      "nrmse_prediction": 0.03977002575993538,
+      "crps_extrapolation": 0.18898789584636688,
+      "nrmse_extrapolation": 0.10187692940235138
+    },
+    "FM": {
+      "crps_prediction": 0.1676238626241684,
+      "nrmse_prediction": 0.2251330465078354,
+      "crps_extrapolation": 0.13058173656463623,
+      "nrmse_extrapolation": 0.25810500979423523
+    },
+    "timing": {
+      "inference_time": 48.55876302719116,
+      "nfe": 75
+    }
+  },
+  "nfe_100": {
+    "AFM": {
+      "crps_prediction": 0.11030419170856476,
+      "nrmse_prediction": 0.0354919396340847,
+      "crps_extrapolation": 0.18424411118030548,
+      "nrmse_extrapolation": 0.09526524692773819
+    },
+    "FM": {
+      "crps_prediction": 0.1775365173816681,
+      "nrmse_prediction": 0.23243972659111023,
+      "crps_extrapolation": 0.13480693101882935,
+      "nrmse_extrapolation": 0.248288094997406
+    },
+    "timing": {
+      "inference_time": 59.35976505279541,
+      "nfe": 100
+    }
+  }
+}

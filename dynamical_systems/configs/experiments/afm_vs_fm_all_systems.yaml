@@ -67,8 +67,7 @@ model:
 # Training Configuration
 training:
   learning_rate: 0.001
-  num_epochs_afm: 150              # Moderate training for multiple systems
-  num_epochs_fm: 300
+  num_epochs: 150                 # Number of training epochs
   early_stopping: true
   patience: 20
 

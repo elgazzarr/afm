@@ -1,32 +1,33 @@
-# History Length Sensitivity Study
-# Studies how history length affects prediction performance
+# History Length AFM vs FM Comparison Study
+# Studies how history/context length affects AFM vs FM prediction performance
 
 experiment:
   type: "history_length_sensitivity"
-  name: "History Length Sensitivity - Lorenz"
-  description: "Study how history length affects AFM vs FM prediction accuracy"
+  name: "History Length AFM vs FM - Lorenz"
+  description: "Compare AFM vs FM performance across different history/context lengths"
   
   # Sweep parameters
   sweep_params:
-    history_size: [10, 20, 30, 40, 50, 60, 70, 80]  # Different history lengths to test
+    history_size: [10, 20, 30, 40, 50, 60, 80] # Different history lengths to test
   
   # Output configuration  
   plots:
-    - "history_vs_accuracy"         # History length vs accuracy plot
-    - "history_vs_crps"            # History length vs CRPS plot
-    - "optimal_history_comparison"  # Comparison at optimal history length
-    - "training_curves"            # Training curves for different history lengths
+    - "history_vs_performance"      # History length vs performance (CRPS, NRMSE)
+    - "afm_vs_fm_comparison"       # Direct AFM vs FM comparison plots
+    - "optimal_history_analysis"   # Analysis of optimal history lengths for each model
+    - "performance_difference"     # AFM-FM performance difference vs history
   
   results:
     save_sweep_results: true       # Save all sweep results
-    metrics_file: "history_sensitivity_results.json"
-    figures_dir: "history_sensitivity"
+    save_models: false             # Don't save models to reduce storage
+    metrics_file: "history_afm_vs_fm_results.json"
+    figures_dir: "history_afm_vs_fm"
 
 # Fixed System Configuration
 system:
   name: lorenz                     # Fixed system for this study
   stochastic: true
-  num_timepoints: 120              # Longer to accommodate max history + prediction
+  num_timepoints: 150              # Longer to accommodate max history + prediction
   t0: 0.0
   t1: 2.0
   
@@ -49,16 +50,14 @@ model:
 # Training Configuration
 training:
   learning_rate: 0.001
-  num_epochs_afm: 150              # Fewer epochs for sweep
-  num_epochs_fm: 300
+  num_epochs: 150                 # Number of training epochs
   early_stopping: true
   patience: 15
 
 # Flow Configuration
 flow:
   n_samples: 30                    # Fewer samples for faster evaluation
-  nfe: 30
-  nfe: 15
+  nfe: 20                          # Fixed NFE for consistent comparison
 
 # Evaluation Configuration
 evaluation:
@@ -72,12 +71,22 @@ evaluation:
 
 # Experiment Settings
 experiment_settings:
-  wandb_project: "flowtime_history_study"
+  wandb_project: "flowtime_history_afm_vs_fm"
   seed: 123
   verbose: true
   save_figures: true
   figure_format: "pdf"
   
   # Analysis settings
-  find_optimal_history: true       # Find optimal history length
-  statistical_testing: true       # Perform significance tests
+  find_optimal_history: true       # Find optimal history length for each model
+  statistical_testing: true       # Perform significance tests between AFM and FM
+  
+# Enhanced W&B Configuration
+wandb:
+  project: "flowtime_history_afm_vs_fm"
+  group: "history_length_sensitivity/lorenz/stochastic"
+  tags: ["history_length", "afm_vs_fm", "lorenz", "parameter_sweep"]
+  notes: "Study how history/context length affects AFM vs FM prediction performance"
+  save_artifacts: true
+  save_models: false
+  upload_plots: true

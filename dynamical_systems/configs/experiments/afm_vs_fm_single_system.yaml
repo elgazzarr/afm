@@ -45,8 +45,7 @@ model:
 # Training Configuration
 training:
   learning_rate: 0.001            # Learning rate
-  num_epochs_afm: 100             # Epochs for AFM training
-  num_epochs_fm: 200              # Epochs for FM training (typically needs more)
+  num_epochs: 50                 # Number of training epochs
   early_stopping: true            # Use early stopping
   patience: 20                    # Early stopping patience
 

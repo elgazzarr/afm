@@ -8,8 +8,8 @@ experiment:
   
   # Sweep parameters
   sweep_params:
-    nfe_values: [5, 10, 15, 20, 30, 40, 50, 75, 100]  # Different NFE values to test
-  
+    nfe_values: [1, 5, 20, 50, 75, 100]  # Different NFE values to test
+
   # Output configuration
   plots:
     - "accuracy_vs_nfe"             # Accuracy vs NFE curve
@@ -28,17 +28,17 @@ experiment:
 # Fixed System Configuration
 system:
   name: lorenz                     # Fixed system for timing consistency
-  stochastic: true
+  stochastic: false
   num_timepoints: 100
   t0: 0.0
   t1: 2.0
-  
+
 # Fixed Data Configuration
 data:
   history_size: 50
   prediction_size: 30
   n_train_test_samples: 256        # Smaller for faster timing measurements
-  batch_size: 32
+  batch_size: 64
 
 # Fixed Model Architecture
 model:
@@ -52,10 +52,9 @@ model:
 # Training Configuration
 training:
   learning_rate: 0.001
-  num_epochs_afm: 100              # Shorter training for timing focus
-  num_epochs_fm: 200
+  num_epochs: 200                 # Number of training epochs
   early_stopping: true
-  patience: 15
+  patience: 5
 
 # Flow Configuration (NFE varies in sweep)
 flow:
@@ -63,7 +62,7 @@ flow:
 
 # Evaluation Configuration
 evaluation:
-  n_eval_samples: 30               # Fewer samples but multiple NFE runs
+  n_eval_samples: 50               # Fewer samples but multiple NFE runs
   test_batch_size: 16              # Smaller batches for consistent timing
   timing_runs: 5                   # Number of timing runs per NFE
   metrics:
