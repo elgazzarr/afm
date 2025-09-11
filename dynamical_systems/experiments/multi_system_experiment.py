@@ -38,7 +38,7 @@ class MultiSystemExperiment(BaseExperiment):
         print(f"\n--- Testing {system_name} ({'stochastic' if stochastic else 'deterministic'}) ---")
         
         # Create system
-        system = create_system(system_name, stochastic)
+        system = create_system(system_name, stochastic, self.config.system_t0, self.config.system_t1)
         
         # Create modified config for this system
         system_config = Config()

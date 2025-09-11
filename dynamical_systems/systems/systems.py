@@ -13,7 +13,7 @@ class DynamicalSystem:
     solver: dfx.AbstractSolver = dfx.Tsit5()
     stochastic: bool = False
 
-def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
+def create_system(name: str, stochastic: bool = False, t0: float = 0.0, t1: float = 20.0) -> DynamicalSystem:
     if name == 'lotka_volterra':
         def vector_field(t, x, args):
             alpha, beta, gamma, delta = args
@@ -35,7 +35,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         if stochastic:
             # Environmental noise affecting both predator and prey
             diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
+            brownian_motion = dfx.VirtualBrownianTree(t0, t1, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -64,7 +64,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         if stochastic:
             diffusion = lambda t, y, args: jnp.array((1.5, 1.5, 1.5))
-            brownian_motion = dfx.VirtualBrownianTree(0, 2, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
+            brownian_motion = dfx.VirtualBrownianTree(t0, t1, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field), 
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -94,7 +94,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         if stochastic:
             # Add noise primarily to the velocity component
             diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
+            brownian_motion = dfx.VirtualBrownianTree(t0, t1, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -125,7 +125,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         if stochastic:
             diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
+            brownian_motion = dfx.VirtualBrownianTree(t0, t1, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -156,7 +156,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         if stochastic:
             # Add noise to membrane potential and recovery variable
             diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
+            brownian_motion = dfx.VirtualBrownianTree(t0, t1, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -185,7 +185,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         if stochastic:
             diffusion = lambda t, y, args: jnp.array((0.1, 0.3))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
+            brownian_motion = dfx.VirtualBrownianTree(t0, t1, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)
@@ -213,7 +213,7 @@ def create_system(name: str, stochastic: bool = False) -> DynamicalSystem:
         
         if stochastic:
             diffusion = lambda t, y, args: jnp.array((1.5, 1.5))
-            brownian_motion = dfx.VirtualBrownianTree(0, 20, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
+            brownian_motion = dfx.VirtualBrownianTree(t0, t1, tol=1e-3, shape=(), key=jrandom.PRNGKey(0))
             system.vector_field = dfx.MultiTerm(
                 dfx.ODETerm(vector_field),
                 dfx.ControlTerm(diffusion, brownian_motion)

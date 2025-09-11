@@ -2,7 +2,7 @@
 
 import yaml
 from dataclasses import dataclass, field
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Dict, Any
 from pathlib import Path
 import jax.numpy as jnp
 
@@ -48,6 +48,9 @@ class Config:
     experiment_results_dir: str = "results"
     experiment_seed: int = 0
     experiment_num_eval_samples: int = 50
+    
+    # Wandb configuration
+    wandb: Optional[Dict[str, Any]] = field(default=None)
     
     # Derived fields (computed after initialization)
     extrapolation_size: int = field(init=False)

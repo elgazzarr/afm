@@ -11,10 +11,22 @@ from pathlib import Path
 
 from ..config_loader import Config
 from ..systems.systems import DynamicalSystem, create_system
+import re
 
 
 # Alias for backward compatibility
 ExperimentConfig = Config
+
+
+def _sanitize_name(name: str) -> str:
+    """Sanitize name for use in WandB artifacts by replacing invalid characters."""
+    # Replace spaces and special characters with underscores
+    sanitized = re.sub(r'[^a-zA-Z0-9._-]', '_', name)
+    # Remove consecutive underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    return sanitized
 
 
 class BaseExperiment(ABC):
@@ -34,7 +46,9 @@ class BaseExperiment(ABC):
         # Initialize system
         self.system = create_system(
             config.system_name, 
-            config.system_stochastic
+            config.system_stochastic,
+            config.system_t0,
+            config.system_t1
         )
         
         # Results storage
@@ -271,7 +285,7 @@ class BaseExperiment(ABC):
             
             # Create and log artifact
             artifact = wandb.Artifact(
-                name=f"{self.config.experiment_name}_results",
+                name=f"{_sanitize_name(self.config.experiment_name)}_results",
                 type="experiment_results",
                 description=f"Results from {self.config.experiment_name}",
                 metadata={
@@ -318,7 +332,7 @@ class BaseExperiment(ABC):
             
             # Create and log artifact
             artifact = wandb.Artifact(
-                name=f"{self.config.experiment_name}_config",
+                name=f"{_sanitize_name(self.config.experiment_name)}_config",
                 type="experiment_config",
                 description=f"Configuration for {self.config.experiment_name}",
                 metadata={
@@ -363,7 +377,7 @@ class BaseExperiment(ABC):
                 
                 # Create and log artifact
                 artifact = wandb.Artifact(
-                    name=f"{self.config.experiment_name}_{model_name}_model",
+                    name=f"{_sanitize_name(self.config.experiment_name)}_{model_name}_model",
                     type="model",
                     description=f"Trained {model_name} model from {self.config.experiment_name}",
                     metadata={

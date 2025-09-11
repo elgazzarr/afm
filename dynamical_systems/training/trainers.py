@@ -118,14 +118,6 @@ class BaseTrainer(ABC):
         
         rng = jrandom.PRNGKey(seed)
         
-        # Log training hyperparameters
-        if use_wandb and wandb.run is not None:
-            wandb.log({
-                f"{self.model_name}/learning_rate": self.learning_rate,
-                f"{self.model_name}/num_epochs": num_epochs,
-                f"{self.model_name}/seed": seed
-            })
-
         for epoch in tqdm(range(num_epochs), desc=f"Training {self.model_name}"):
             # Training loop
             epoch_loss = 0.0
@@ -164,8 +156,6 @@ class BaseTrainer(ABC):
                 wandb_metrics = {
                     f"{self.model_name}/train_loss": avg_train_loss,
                     f"{self.model_name}/val_loss": avg_test_loss,
-                    f"{self.model_name}/train_loss_std": jnp.std(jnp.array(batch_losses)),
-                    f"{self.model_name}/epoch": epoch + 1
                 }
                 
                 # Log gradient norms if requested

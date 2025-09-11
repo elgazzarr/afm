@@ -73,7 +73,6 @@ class AFMvsFMComparison(BaseExperiment):
         test_loader = test_data
         
         # Train AFM model
-        print('Training AFM Model...')
         afm_trainer = AFMTrainer(
             models['AFM'], 
             learning_rate=self.config.training_learning_rate,
@@ -84,7 +83,6 @@ class AFMvsFMComparison(BaseExperiment):
         afm_trainer.train(train_loader, test_loader, num_epochs=self.config.training_num_epochs)
         
         # Train FM model (typically needs more epochs)
-        print('Training FM Model...')
         fm_trainer = FMTrainer(
             models['FM'],
             learning_rate=self.config.training_learning_rate,
