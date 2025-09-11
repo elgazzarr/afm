@@ -1,4 +1,4 @@
-"""Experiment-specific plotting utilities for generating publication-ready figures."""
+"""Experiment-specific plotting utilities with enhanced wandb integration."""
 
 from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 import pandas as pd
+import wandb
 
 
 def setup_matplotlib_style():
@@ -28,10 +29,26 @@ def setup_matplotlib_style():
     })
 
 
+def upload_plot_to_wandb(fig, plot_name: str, upload_enabled: bool = True) -> None:
+    """Upload matplotlib figure to wandb.
+    
+    Args:
+        fig: Matplotlib figure object
+        plot_name: Name for the plot in wandb
+        upload_enabled: Whether to upload to wandb
+    """
+    if upload_enabled and wandb.run is not None:
+        try:
+            wandb.log({plot_name: wandb.Image(fig)})
+        except Exception as e:
+            print(f"Warning: Failed to upload plot {plot_name} to wandb: {e}")
+
+
 def plot_history_sensitivity_results(
     sweep_results: Dict[str, Any],
     save_path: Optional[str] = None,
-    title: str = "History Length Sensitivity Analysis"
+    title: str = "History Length Sensitivity Analysis",
+    upload_to_wandb: bool = True
 ) -> None:
     """Plot history length sensitivity results.
     
@@ -103,6 +120,9 @@ def plot_history_sensitivity_results(
     if save_path:
         plt.savefig(save_path)
         print(f"Saved history sensitivity plot to {save_path}")
+    
+    # Upload to wandb
+    upload_plot_to_wandb(fig, "plots/history_sensitivity_analysis", upload_to_wandb)
     
     plt.show()
 

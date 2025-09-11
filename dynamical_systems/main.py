@@ -64,6 +64,11 @@ Available experiment types:
         help='Random seed for reproducibility (default: 0)'
     )
     
+    parser.add_argument(
+        '--sweep', action='store_true',
+        help='Enable W&B hyperparameter sweep mode'
+    )
+    
     # Backward compatibility: individual parameter overrides
     # (Note: These will override values in the config file if provided)
     parser.add_argument(
@@ -139,6 +144,41 @@ def apply_arg_overrides(runner: ExperimentRunner, args) -> None:
         config._compute_derived_fields()
 
 
+def apply_sweep_overrides(config: 'Config') -> None:
+    """Apply W&B sweep parameter overrides to configuration.
+    
+    Args:
+        config: Configuration to modify
+    """
+    try:
+        import wandb
+        
+        if wandb.run is None:
+            print("Warning: --sweep flag used but not in W&B sweep context")
+            return
+        
+        sweep_config = wandb.config
+        
+        # Apply sweep parameters to config
+        for key, value in sweep_config.items():
+            # Skip special wandb keys
+            if key.startswith('_'):
+                continue
+                
+            # Handle nested parameter names like 'data_history_size'
+            if hasattr(config, key):
+                setattr(config, key, value)
+                print(f"Sweep override: {key} = {value}")
+        
+        # Recompute derived fields after sweep overrides
+        config._compute_derived_fields()
+        
+    except ImportError:
+        print("Warning: wandb not available for sweep mode")
+    except Exception as e:
+        print(f"Warning: Failed to apply sweep overrides: {e}")
+
+
 def main():
     """Main function."""
     args = parse_args()
@@ -174,6 +214,10 @@ def main():
         
         # Apply command line overrides
         apply_arg_overrides(runner, args)
+        
+        # Handle sweep mode
+        if args.sweep:
+            apply_sweep_overrides(runner.config)
         
         # Validation mode
         if args.validate:

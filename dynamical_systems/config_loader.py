@@ -201,6 +201,14 @@ Experiment: {self.experiment_name} (seed: {self.experiment_seed})
             flattened['experiment_seed'] = experiment.get('seed', 0)
             flattened['experiment_num_eval_samples'] = experiment.get('num_eval_samples', 50)
         
+        # Wandb section (enhanced configuration)
+        if 'wandb' in yaml_data:
+            wandb_config = yaml_data['wandb']
+            flattened['wandb'] = wandb_config
+            # Override project if specified in wandb section
+            if 'project' in wandb_config:
+                flattened['experiment_wandb_project'] = wandb_config['project']
+        
         return cls(**flattened)
 
     @classmethod

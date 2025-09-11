@@ -76,7 +76,10 @@ class AFMvsFMComparison(BaseExperiment):
         print('Training AFM Model...')
         afm_trainer = AFMTrainer(
             models['AFM'], 
-            learning_rate=self.config.training_learning_rate
+            learning_rate=self.config.training_learning_rate,
+            model_name="AFM",
+            log_gradients=getattr(self.config, 'log_gradients', False),
+            log_frequency=getattr(self.config, 'log_frequency', 10)
         )
         afm_trainer.train(train_loader, test_loader, num_epochs=self.config.training_num_epochs)
         
@@ -84,7 +87,10 @@ class AFMvsFMComparison(BaseExperiment):
         print('Training FM Model...')
         fm_trainer = FMTrainer(
             models['FM'],
-            learning_rate=self.config.training_learning_rate
+            learning_rate=self.config.training_learning_rate,
+            model_name="FM",
+            log_gradients=getattr(self.config, 'log_gradients', False),
+            log_frequency=getattr(self.config, 'log_frequency', 10)
         )
         fm_trainer.train(
             train_loader, 

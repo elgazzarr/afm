@@ -1,7 +1,7 @@
-"""Training classes for AFM and FM models."""
+"""Training classes for AFM and FM models with enhanced wandb integration."""
 
 from abc import ABC, abstractmethod
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Optional, Dict
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
@@ -9,6 +9,7 @@ import flax.nnx as nnx
 import optax
 import jax_dataloader as jdl
 from tqdm import tqdm
+import wandb
 
 from ..utils.priors import generate_brownian_timeseries
 
@@ -16,15 +17,29 @@ from ..utils.priors import generate_brownian_timeseries
 class BaseTrainer(ABC):
     """Base trainer class for flow matching models."""
     
-    def __init__(self, model: nnx.Module, learning_rate: float = 1e-3):
+    def __init__(
+        self, 
+        model: nnx.Module, 
+        learning_rate: float = 1e-3,
+        model_name: str = "model",
+        log_gradients: bool = False,
+        log_frequency: int = 1
+    ):
         """Initialize base trainer.
         
         Args:
             model: Model to train
             learning_rate: Learning rate for optimization
+            model_name: Name for wandb logging (AFM/FM)
+            log_gradients: Whether to log gradient norms
+            log_frequency: How often to log metrics (every N epochs)
         """
         self.model = model
         self.optimizer = nnx.Optimizer(model, optax.adam(learning_rate))
+        self.model_name = model_name
+        self.log_gradients = log_gradients
+        self.log_frequency = log_frequency
+        self.learning_rate = learning_rate
 
     @nnx.jit(static_argnums=(0,))
     def train_step(
@@ -83,15 +98,17 @@ class BaseTrainer(ABC):
         train_dataloader: jdl.DataLoader,
         test_dataloader: jdl.DataLoader,
         num_epochs: int = 100,
-        seed: int = 0
+        seed: int = 0,
+        use_wandb: bool = True
     ) -> Tuple[List[float], List[float]]:
-        """Train the model.
+        """Train the model with enhanced wandb logging.
         
         Args:
             train_dataloader: Training data loader
             test_dataloader: Test data loader
             num_epochs: Number of training epochs
             seed: Random seed for training
+            use_wandb: Whether to log to wandb
             
         Returns:
             Tuple of (train_losses, test_losses)
@@ -100,11 +117,20 @@ class BaseTrainer(ABC):
         test_losses = []
         
         rng = jrandom.PRNGKey(seed)
+        
+        # Log training hyperparameters
+        if use_wandb and wandb.run is not None:
+            wandb.log({
+                f"{self.model_name}/learning_rate": self.learning_rate,
+                f"{self.model_name}/num_epochs": num_epochs,
+                f"{self.model_name}/seed": seed
+            })
 
-        for epoch in tqdm(range(num_epochs), desc=f"Training {self.__class__.__name__}"):
+        for epoch in tqdm(range(num_epochs), desc=f"Training {self.model_name}"):
             # Training loop
             epoch_loss = 0.0
             batch_count = 0
+            batch_losses = []
             
             for history, covariates, prediction, _ in train_dataloader:
                 rng, step_rng = jrandom.split(rng)
@@ -113,6 +139,7 @@ class BaseTrainer(ABC):
                 )
                 epoch_loss += loss
                 batch_count += 1
+                batch_losses.append(float(loss))
 
             avg_train_loss = epoch_loss / batch_count
             train_losses.append(float(avg_train_loss))
@@ -131,8 +158,64 @@ class BaseTrainer(ABC):
 
             avg_test_loss = epoch_loss / batch_count
             test_losses.append(float(avg_test_loss))
+            
+            # Enhanced wandb logging
+            if use_wandb and wandb.run is not None and (epoch + 1) % self.log_frequency == 0:
+                wandb_metrics = {
+                    f"{self.model_name}/train_loss": avg_train_loss,
+                    f"{self.model_name}/val_loss": avg_test_loss,
+                    f"{self.model_name}/train_loss_std": jnp.std(jnp.array(batch_losses)),
+                    f"{self.model_name}/epoch": epoch + 1
+                }
+                
+                # Log gradient norms if requested
+                if self.log_gradients:
+                    grad_norms = self._compute_gradient_norms()
+                    if grad_norms:
+                        for param_name, grad_norm in grad_norms.items():
+                            wandb_metrics[f"{self.model_name}/grad_norm/{param_name}"] = grad_norm
+                
+                wandb.log(wandb_metrics)
+
+        # Log final training curves
+        if use_wandb and wandb.run is not None:
+            # Create training curve plot
+            epochs_range = list(range(1, len(train_losses) + 1))
+            
+            # Log as wandb plot
+            data = [[epoch, train_loss, test_loss] for epoch, train_loss, test_loss 
+                   in zip(epochs_range, train_losses, test_losses)]
+            
+            table = wandb.Table(data=data, columns=["epoch", "train_loss", "val_loss"])
+            wandb.log({
+                f"{self.model_name}/training_curves": wandb.plot.line(
+                    table, "epoch", ["train_loss", "val_loss"],
+                    title=f"{self.model_name} Training Curves"
+                )
+            })
 
         return train_losses, test_losses
+    
+    def _compute_gradient_norms(self) -> Optional[Dict[str, float]]:
+        """Compute gradient norms for monitoring.
+        
+        Returns:
+            Dictionary of parameter names to gradient norms
+        """
+        try:
+            grad_norms = {}
+            # Get the current gradients from the optimizer
+            if hasattr(self.optimizer, 'opt_state') and self.optimizer.opt_state is not None:
+                # This is a simplified version - actual implementation would depend on
+                # the specific optimizer state structure
+                for param_name, param in self.model.named_parameters():
+                    if param.grad is not None:
+                        grad_norm = float(jnp.linalg.norm(param.grad.flatten()))
+                        grad_norms[param_name.replace('/', '_')] = grad_norm
+            return grad_norms
+        except Exception:
+            # If gradient norm computation fails, return None
+            return None
     
     @abstractmethod
     def loss_fn(

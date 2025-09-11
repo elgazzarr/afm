@@ -68,8 +68,19 @@ evaluation:
 
 # Experiment Configuration
 experiment_settings:
-  wandb_project: "flowtime_single_system"
   seed: 42                        # Random seed for reproducibility
   verbose: true                   # Print detailed progress
   save_figures: true              # Save result plots
   figure_format: "pdf"            # Figure format (pdf, png, etc.)
+
+# Enhanced W&B Configuration
+wandb:
+  project: "flowtime_single_system"
+  group: "afm_vs_fm_single_system/lorenz/stochastic"  # Custom group (optional)
+  tags: ["single_system", "lorenz", "baseline"]       # Custom tags
+  notes: "Baseline comparison of AFM vs FM on Lorenz system with enhanced tracking"
+  save_artifacts: true            # Save results and config as artifacts
+  save_models: false              # Save trained models (can be large)
+  upload_plots: true              # Upload plots to wandb
+  log_gradients: false            # Log gradient norms during training
+  log_frequency: 10               # Log metrics every N epochs

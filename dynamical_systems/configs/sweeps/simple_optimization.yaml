@@ -1,0 +1,46 @@
+# Simple W&B Sweep for AFM vs FM Optimization
+# Optimizes key hyperparameters for best performance
+
+program: main.py
+project: flowtime_optimization
+entity: your-wandb-entity
+
+method: bayes
+metric:
+  name: AFM/crps_prediction
+  goal: minimize
+
+parameters:
+  config:
+    value: configs/experiments/afm_vs_fm_single_system.yaml
+    
+  # Key parameters to optimize
+  training_learning_rate:
+    distribution: log_uniform
+    min: 0.0001
+    max: 0.01
+    
+  model_hidden_dim:
+    values: [32, 64, 96, 128]
+    
+  model_n_rnn_layers:
+    values: [2, 3, 4]
+    
+  flow_nfe:
+    values: [10, 20, 30, 50]
+
+# Stop bad runs early
+early_terminate:
+  type: hyperband
+  min_iter: 20
+  
+# Limit number of runs
+count: 30
+
+command:
+  - python
+  - -m
+  - dynamical_systems.main
+  - --config
+  - ${config}
+  - --sweep
