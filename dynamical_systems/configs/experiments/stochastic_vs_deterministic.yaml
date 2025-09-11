@@ -1,0 +1,97 @@
+# Stochastic vs Deterministic Systems Study
+# Compares model performance on stochastic vs deterministic versions of systems
+
+experiment:
+  type: "stochastic_vs_deterministic"
+  name: "Stochastic vs Deterministic Systems"
+  description: "Compare AFM/FM performance on stochastic vs deterministic dynamical systems"
+  
+  # Systems to compare (each tested in both stochastic and deterministic modes)
+  systems:
+    - lorenz
+    - vanderpol  
+    - lotka_volterra
+    - fitzhugh_nagumo
+    - brusselator
+  
+  # Output configuration
+  plots:
+    - "stochastic_vs_deterministic_comparison"  # Bar chart comparison
+    - "noise_robustness_analysis"               # Robustness to different noise levels
+    - "uncertainty_quantification_comparison"    # UQ performance comparison  
+    - "trajectory_examples"                     # Example trajectories
+    - "noise_sensitivity_heatmap"               # Heatmap of noise sensitivity
+  
+  results:
+    save_noise_analysis: true       # Save detailed noise analysis
+    save_trajectory_samples: true   # Save sample trajectories
+    metrics_file: "stochastic_deterministic_results.json"
+    figures_dir: "stochastic_deterministic"
+    comparison_table: "stoch_vs_det_summary.csv"
+
+# System Configuration (base settings)
+system:
+  num_timepoints: 100
+  t0: 0.0
+  t1: 20.0
+  # stochastic varies per system comparison
+  
+# Data Configuration
+data:
+  history_size: 50
+  prediction_size: 30
+  n_train_test_samples: 512
+  batch_size: 64
+
+# Model Architecture
+model:
+  covariates_dim: 1
+  hidden_dim: 64
+  time_dim: 16
+  hidden_blocks: 3
+  rnn_hidden: 64
+  n_rnn_layers: 3
+
+# Training Configuration
+training:
+  learning_rate: 0.001
+  num_epochs_afm: 200
+  num_epochs_fm: 400
+  early_stopping: true
+  patience: 20
+
+# Flow Configuration
+flow:
+  n_samples: 50                    # More samples for uncertainty quantification
+  n_steps_flow: 50
+  nfe: 25
+
+# Evaluation Configuration
+evaluation:
+  n_eval_samples: 100              # More samples for robust statistics
+  test_batch_size: 32
+  metrics:
+    - "crps_prediction"            # Especially important for stochastic systems
+    - "nrmse_prediction"
+    - "crps_extrapolation"
+    - "nrmse_extrapolation"
+    - "prediction_interval_coverage"  # Coverage of prediction intervals
+    - "sharpness"                  # Sharpness of prediction intervals
+
+# Experiment Settings
+experiment_settings:
+  wandb_project: "flowtime_stochastic_study"
+  seed: 321
+  verbose: true
+  save_figures: true
+  figure_format: "pdf"
+  
+  # Stochastic-specific settings
+  noise_levels: [0.1, 0.5, 1.0, 1.5, 2.0]  # Different noise levels to test
+  uncertainty_analysis: true        # Deep uncertainty quantification analysis
+  prediction_intervals: [0.5, 0.8, 0.9, 0.95]  # Prediction interval levels
+  
+  # Statistical analysis
+  statistical_tests: true          # Test significance of differences
+  effect_size_analysis: true       # Analyze effect sizes
+  robustness_metrics: true         # Calculate robustness metrics
