@@ -114,7 +114,6 @@ class BaseExperiment(ABC):
             
             # Flow matching configuration
             'flow_n_samples': self.config.flow_n_samples,
-            'flow_n_steps_flow': self.config.flow_n_steps_flow,
             'flow_nfe': self.config.flow_nfe,
             
             # Evaluation configuration

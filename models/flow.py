@@ -59,13 +59,13 @@ class Flow(nnx.Module):
         return self.vector_field(z, h, c[z_history.shape[0]], t)
     
     
-    def sample_flow(self, history, covariates, n_steps_pred, n_steps_flow, n_samples, key):
+    def sample_flow(self, history, covariates, n_steps_pred, nfe, n_samples, key):
         
         def predict(
             key: jax.random.PRNGKey,
             history: jnp.ndarray,   
             covariates: jnp.ndarray,
-            n_steps_flow: int,
+            nfe: int,
             n_steps_pred: int
         ) -> jnp.ndarray:
             
@@ -75,7 +75,7 @@ class Flow(nnx.Module):
                 
             term = ODETerm(vf)
             solver = dfx.Euler()
-            dt = 1/n_steps_flow
+            dt = 1/nfe
 
             context_scaler = self.context_scaler
             context_length = history.shape[0]
@@ -107,5 +107,5 @@ class Flow(nnx.Module):
         vmapped_predict = jax.vmap(predict, in_axes=(None, 0, 0, None, None))  # vmap over batch
         vmapped_predict = jax.vmap(vmapped_predict, in_axes=(0, None, None, None, None))  # vmap over samples
         
-        pred_samples = vmapped_predict(key_samples, history, covariates, n_steps_flow, n_steps_pred)
+        pred_samples = vmapped_predict(key_samples, history, covariates, nfe, n_steps_pred)
         return pred_samples

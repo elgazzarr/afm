@@ -173,7 +173,7 @@ class AFMvsFMComparison(BaseExperiment):
             self.key, 
             history, 
             covariates,
-            n_steps_flow=self.config.flow_nfe,
+            nfe=self.config.flow_nfe,
             n_steps_pred=(
                 self.config.data_prediction_size + 
                 self.config.extrapolation_size

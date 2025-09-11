@@ -28,7 +28,7 @@ system:
   stochastic: true
   num_timepoints: 120              # Longer to accommodate max history + prediction
   t0: 0.0
-  t1: 24.0
+  t1: 2.0
   
 # Fixed Data Configuration  
 data:
@@ -57,7 +57,7 @@ training:
 # Flow Configuration
 flow:
   n_samples: 30                    # Fewer samples for faster evaluation
-  n_steps_flow: 30
+  nfe: 30
   nfe: 15
 
 # Evaluation Configuration

@@ -127,7 +127,6 @@ def apply_arg_overrides(runner: ExperimentRunner, args) -> None:
     # Flow overrides
     if args.nfe:
         config.flow_nfe = args.nfe
-        config.flow_n_steps_flow = args.nfe
         print(f"Override: nfe = {args.nfe}")
     
     # Data overrides

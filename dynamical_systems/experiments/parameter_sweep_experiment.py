@@ -314,7 +314,6 @@ class NFEEfficiencyExperiment(ParameterSweepExperiment):
                     setattr(sweep_config, attr, getattr(self.config, attr))
             
             sweep_config.flow_nfe = nfe
-            sweep_config.flow_n_steps_flow = nfe
             sweep_config._compute_derived_fields()
             
             # Measure timing

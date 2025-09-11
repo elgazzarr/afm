@@ -38,7 +38,6 @@ class Config:
     
     # Flow parameters
     flow_n_samples: int = 50
-    flow_n_steps_flow: int = 50
     flow_nfe: int = 20
     
     # Experiment parameters
@@ -191,7 +190,6 @@ Experiment: {self.experiment_name} (seed: {self.experiment_seed})
         if 'flow' in yaml_data:
             flow = yaml_data['flow']
             flattened['flow_n_samples'] = flow.get('n_samples', 50)
-            flattened['flow_n_steps_flow'] = flow.get('n_steps_flow', 50)
             flattened['flow_nfe'] = flow.get('nfe', 20)
         
         # Experiment section
@@ -234,7 +232,6 @@ Experiment: {self.experiment_name} (seed: {self.experiment_seed})
             data_prediction_size=getattr(args, 'prediction_size', 30),
             data_n_train_test_samples=1024,
             data_batch_size=256,
-            flow_n_steps_flow=getattr(args, 'nfe', 20),
             training_num_epochs=getattr(args, 'num_epochs', 200),
             flow_nfe=getattr(args, 'nfe', 20),
             experiment_name=f"{getattr(args, 'system', 'lorenz')}_{getattr(args, 'nfe', 20)}",

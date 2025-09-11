@@ -24,7 +24,7 @@ system:
   stochastic: true                 # Whether to use stochastic version
   num_timepoints: 100              # Length of trajectories
   t0: 0.0                         # Start time
-  t1: 5.0                        # End time
+  t1: 2.0                        # End time
   
 # Data Configuration  
 data:
@@ -53,8 +53,7 @@ training:
 # Flow Matching Configuration  
 flow:
   n_samples: 50                   # Samples for uncertainty quantification
-  n_steps_flow: 50                # NFE for sampling
-  nfe: 20                         # Alternative NFE parameter
+  nfe: 20                         # Number of function evaluations for sampling
 
 # Evaluation Configuration
 evaluation:

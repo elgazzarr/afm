@@ -46,7 +46,7 @@ experiment:
 system:
   num_timepoints: 100
   t0: 0.0
-  t1: 20.0
+  t1: 2.0
   
 # Data Configuration  
 data:
@@ -75,7 +75,7 @@ training:
 # Flow Configuration
 flow:
   n_samples: 40
-  n_steps_flow: 40
+  nfe: 40
   nfe: 20
 
 # Evaluation Configuration

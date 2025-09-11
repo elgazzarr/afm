@@ -99,7 +99,7 @@ class AutoregressiveFlowMatching(BaseFlow):
         key: jax.random.PRNGKey,
         history: jnp.ndarray,
         covariates: jnp.ndarray,
-        n_steps_flow: int,
+        nfe: int,
         n_steps_pred: int,
         n_samples: int = 50
     ) -> jnp.ndarray:
@@ -109,7 +109,7 @@ class AutoregressiveFlowMatching(BaseFlow):
             key: Random key for sampling
             history: Historical sequence data
             covariates: Covariate information  
-            n_steps_flow: Number of ODE integration steps
+            nfe: Number of function evaluations (ODE integration steps)
             n_steps_pred: Number of prediction steps
             n_samples: Number of samples to generate
             
@@ -120,7 +120,7 @@ class AutoregressiveFlowMatching(BaseFlow):
             key: jax.random.PRNGKey,
             history: jnp.ndarray,
             covariates: jnp.ndarray,
-            n_steps_flow: int,
+            nfe: int,
             n_steps_pred: int
         ) -> jnp.ndarray:
             """Generate a single prediction sample."""
@@ -130,7 +130,7 @@ class AutoregressiveFlowMatching(BaseFlow):
                 
             term = dfx.ODETerm(vf)
             solver = dfx.Euler()
-            dt = 1 / n_steps_flow
+            dt = 1 / nfe
             
             predictions = []
             current_history = history
@@ -165,7 +165,7 @@ class AutoregressiveFlowMatching(BaseFlow):
         vmapped_predict = jax.vmap(vmapped_predict, in_axes=(0, None, None, None, None))
         
         pred_samples = vmapped_predict(
-            key_samples, history, covariates, n_steps_flow, n_steps_pred
+            key_samples, history, covariates, nfe, n_steps_pred
         )
         
         return pred_samples

@@ -63,7 +63,7 @@ training:
 # Flow Configuration
 flow:
   n_samples: 50                    # More samples for uncertainty quantification
-  n_steps_flow: 50
+  nfe: 50
   nfe: 25
 
 # Evaluation Configuration

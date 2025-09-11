@@ -79,7 +79,7 @@ class ModelEvaluator:
                 key, 
                 history, 
                 covariates,
-                n_steps_flow=self.nfe,
+                nfe=self.nfe,
                 n_steps_pred=(
                     self.config.data_prediction_size + 
                     self.config.extrapolation_size

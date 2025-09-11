@@ -9,7 +9,6 @@ experiment:
   # Sweep parameters
   sweep_params:
     nfe_values: [5, 10, 15, 20, 30, 40, 50, 75, 100]  # Different NFE values to test
-    n_steps_flow: [5, 10, 15, 20, 30, 40, 50, 75, 100]  # Match NFE values
   
   # Output configuration
   plots:
@@ -32,7 +31,7 @@ system:
   stochastic: true
   num_timepoints: 100
   t0: 0.0
-  t1: 20.0
+  t1: 2.0
   
 # Fixed Data Configuration
 data:
