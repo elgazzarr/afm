@@ -4,6 +4,14 @@ AFM is a JAX library for probabilistic multivariate time series forecasting. Giv
 
 [[Paper]](https://arxiv.org/abs/2503.10375)
 
+<p align="center">
+  <img src="assets/framework.png" width="100%" alt="AFM Framework"/>
+</p>
+
+<p align="center">
+  <img src="assets/examples.png" width="100%" alt="AFM vs Standard Flow Matching Predictions"/>
+</p>
+
 ## Installation
 
 ```bash
