@@ -1,0 +1,84 @@
+# AFM vs FM with Infinite Dataloader Test
+experiment:
+  type: "afm_vs_fm_single_system"
+  name: "AFM vs FM - Infinite Dataloader Test"
+  description: "Test new infinite dataloader with parallel AFM training"
+
+  plots:
+    - "trajectory_predictions"
+    - "metrics_comparison"
+
+  results:
+    save_models: false
+    save_predictions: false
+    metrics_file: "infinite_test_results.json"
+    figures_dir: "infinite_test"
+
+# System Configuration
+system:
+  name: lorenz
+  stochastic: true
+  num_timepoints: 200
+  t0: 0.0
+  t1: 10.0
+
+# Traditional Data Configuration (when use_infinite_dataloader=false)
+data:
+  history_size: 50
+  prediction_size: 30
+  n_train_test_samples: 512
+  batch_size: 64
+
+# NEW: Infinite dataloader configuration
+  use_infinite_dataloader: true
+  context_length: 60
+  afm_prediction_horizon: 1
+  fm_prediction_horizon: 35
+  steps_per_epoch: 50
+
+# Model Architecture
+model:
+  covariates_dim: 1
+  hidden_dim: 64
+  time_dim: 16
+  hidden_blocks: 3
+  rnn_hidden: 64
+  n_rnn_layers: 3
+
+# Training Configuration
+training:
+  learning_rate: 0.001
+  num_epochs: 10  # Reduced for testing
+  early_stopping: false
+
+# Flow Matching Configuration
+flow:
+  n_samples: 20  # Reduced for testing
+  nfe: 10       # Reduced for testing
+
+# Evaluation Configuration
+evaluation:
+  n_eval_samples: 50  # Reduced for testing
+  test_batch_size: 32
+  metrics:
+    - "crps_prediction"
+    - "nrmse_prediction"
+
+# Experiment Configuration
+experiment_settings:
+  seed: 42
+  verbose: true
+  save_figures: false  # Disabled for testing
+  figure_format: "png"
+
+# W&B Configuration
+wandb:
+  project: "flowtime_infinite_dataloader_test"
+  group: "infinite_dataloader_test"
+  tags: ["infinite_dataloader", "parallel_afm", "test"]
+  notes: "Testing new infinite dataloader with parallel AFM training"
+  save_artifacts: false
+  save_models: false
+  upload_plots: false
+  log_gradients: false
+  log_frequency: 5

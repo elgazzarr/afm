@@ -1,0 +1,97 @@
+# NFE Efficiency Study
+# Studies the tradeoff between Number of Function Evaluations (NFE) and accuracy
+
+experiment:
+  type: "nfe_efficiency_study"
+  name: "NFE Efficiency Analysis - Lorenz"
+  description: "Study accuracy vs computational cost tradeoff by varying NFE"
+
+  # Sweep parameters
+  sweep_params:
+    nfe_values: [1, 5, 20, 50, 75, 100]  # Different NFE values to test
+
+  # Output configuration
+  plots:
+    - "accuracy_vs_nfe"             # Accuracy vs NFE curve
+    - "efficiency_frontier"         # Pareto frontier of accuracy vs speed
+    - "timing_analysis"             # Timing measurements for different NFEs
+    - "nfe_comparison_trajectories" # Sample trajectories for different NFEs
+    - "optimal_nfe_analysis"        # Analysis of optimal NFE choice
+
+  results:
+    save_timing_data: true          # Save detailed timing measurements
+    save_efficiency_analysis: true  # Save efficiency analysis
+    metrics_file: "nfe_efficiency_results.json"
+    figures_dir: "nfe_efficiency"
+    timing_file: "nfe_timing_analysis.json"
+
+# Fixed System Configuration
+system:
+  name: lorenz                     # Fixed system for timing consistency
+  stochastic: false
+  num_timepoints: 100
+  t0: 0.0
+  t1: 2.0
+
+# Fixed Data Configuration
+data:
+  history_size: 50
+  # Infinite dataloader parameters
+  context_length: 50
+  afm_prediction_horizon: 1
+  fm_prediction_horizon: 30
+  steps_per_epoch: 100
+  prediction_size: 30
+  n_train_test_samples: 256        # Smaller for faster timing measurements
+  batch_size: 64
+
+# Fixed Model Architecture
+model:
+  covariates_dim: 1
+  hidden_dim: 64
+  time_dim: 16
+  hidden_blocks: 3
+  rnn_hidden: 64
+  n_rnn_layers: 3
+
+# Training Configuration
+training:
+  learning_rate: 0.001
+  num_epochs: 200                 # Number of training epochs
+  early_stopping: true
+  patience: 5
+
+# Flow Configuration (NFE varies in sweep)
+flow:
+  n_samples: 20                    # Fewer samples for faster timing
+
+# Evaluation Configuration
+evaluation:
+  n_eval_samples: 50               # Fewer samples but multiple NFE runs
+  test_batch_size: 16              # Smaller batches for consistent timing
+  timing_runs: 5                   # Number of timing runs per NFE
+  metrics:
+    - "crps_prediction"
+    - "nrmse_prediction"
+    - "crps_extrapolation"
+    - "nrmse_extrapolation"
+    - "inference_time"              # Add timing metric
+    - "samples_per_second"          # Throughput metric
+
+# Experiment Settings
+experiment_settings:
+  wandb_project: "flowtime_nfe_study"
+  seed: 789
+  verbose: true
+  save_figures: true
+  figure_format: "pdf"
+
+  # Timing settings
+  warmup_runs: 3                   # Warmup runs before timing
+  measure_memory: true             # Measure memory usage too
+  profile_sampling: true           # Profile the sampling process
+
+  # Analysis settings
+  find_optimal_nfe: true           # Find optimal NFE for given accuracy target
+  efficiency_analysis: true        # Analyze efficiency tradeoffs
+  cost_benefit_analysis: true      # Cost-benefit analysis

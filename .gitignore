@@ -1,27 +1,41 @@
-# Ignore node_modules directory
-node_modules/
-
-# Ignore log files
-*.log
-
-# Ignore environment variable files
-.env
-
-# Ignore build directories
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
 dist/
 build/
+.eggs/
 
-# Ignore OS generated files
-.DS_Store
-Thumbs.db
+# Virtual environments
+.venv/
+venv/
+env/
 
-# Ignore IDE specific files
+# IDE
 .vscode/
 .idea/
 *.iml
-wandb/
-*.pyc
-outputs/
+*.swp
+*.swo
+.claude/
+# OS
+.DS_Store
+Thumbs.db
 
-dynamical_systems/results/
-dynamical_systems/wandb/
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# Experiment outputs
+results/
+outputs/
+wandb/
+
+# Jupyter
+.ipynb_checkpoints/
