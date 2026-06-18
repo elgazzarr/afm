@@ -13,15 +13,18 @@ import flax.nnx as nnx
 from afm.config import Config
 from afm.datasets.cmapss import load_cmapss, load_cmapss_rul, derive_rul, nasa_score
 from afm.datasets.eval import evaluate_on_trajectories
+from afm.datasets.run_config import build_afm_config
 from afm.training.data import create_infinite_dataloaders
 from afm.training.trainers import AFMTrainer
 from afm.models import AutoregressiveFlowMatching
+
 
 def make_model(dim, cfg):
     return AutoregressiveFlowMatching(
         dim_x=dim, dim_c=1, dim_h=cfg.model_hidden_dim, dim_t=cfg.model_time_dim,
         dim_hidden=cfg.model_hidden_dim, hidden_blocks=cfg.model_hidden_blocks,
         n_rnn_layers=cfg.model_n_rnn_layers, rnn_hidden=cfg.model_rnn_hidden, rngs=nnx.Rngs(0))
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -36,11 +39,11 @@ def main():
                                context_length=args.ctx, fm_prediction_horizon=40,
                                data_prediction_size=40), subset=args.subset)
     L = probe.meta["length"]; pred = L - args.ctx
-    cfg = Config(system_name=f"cmapss_{args.subset.lower()}", system_num_timepoints=L,
-                 context_length=args.ctx, afm_prediction_horizon=1,
-                 fm_prediction_horizon=pred, data_prediction_size=pred,
-                 data_batch_size=64, steps_per_epoch=100, model_covariates_dim=1,
-                 flow_nfe=20, flow_n_samples=50)
+
+    cfg = build_afm_config(f"cmapss_{args.subset.lower()}", length=L,
+                           context_length=args.ctx, forecast_horizon=pred,
+                           data_batch_size=64, steps_per_epoch=100,
+                           flow_nfe=20, flow_n_samples=50)
     ds = load_cmapss(cfg, subset=args.subset)
     (afm_train, afm_test), _ = create_infinite_dataloaders(
         jnp.asarray(ds.train_traj), jnp.asarray(ds.test_traj), jnp.asarray(ds.covariates), cfg)
@@ -53,14 +56,12 @@ def main():
 
     # ---------- (B) RUL via health-index forecasting ----------
     rul = load_cmapss_rul(cfg, subset=args.subset)
-    hicfg = Config(system_name=f"cmapss_{args.subset.lower()}",
-                   system_num_timepoints=rul["train_hi"].shape[1],
-                   context_length=args.ctx, afm_prediction_horizon=1,
-                   fm_prediction_horizon=rul["train_hi"].shape[1] - args.ctx,
-                   data_prediction_size=rul["train_hi"].shape[1] - args.ctx,
-                   data_batch_size=64, steps_per_epoch=100, model_covariates_dim=1,
-                   flow_nfe=20, flow_n_samples=50)
-    cov = np.linspace(0, 1, rul["train_hi"].shape[1]).astype(np.float32)
+    hi_L = rul["train_hi"].shape[1]
+    hicfg = build_afm_config(f"cmapss_{args.subset.lower()}", length=hi_L,
+                              context_length=args.ctx, forecast_horizon=hi_L - args.ctx,
+                              data_batch_size=64, steps_per_epoch=100,
+                              flow_nfe=20, flow_n_samples=50)
+    cov = np.linspace(0, 1, hi_L).astype(np.float32)
     (hi_train, hi_test), _ = create_infinite_dataloaders(
         jnp.asarray(rul["train_hi"]), jnp.asarray(rul["train_hi"][:1]), jnp.asarray(cov), hicfg)
     himodel = make_model(1, hicfg)
@@ -79,6 +80,7 @@ def main():
     rmse = float(np.sqrt(np.mean((rul_pred - rul_true) ** 2)))
     print(f"[cmapss {args.subset} RUL cap={args.cap}] RMSE={rmse:.2f} cycles  "
           f"Score={nasa_score(rul_pred, rul_true):.1f}")
+
 
 if __name__ == "__main__":
     main()

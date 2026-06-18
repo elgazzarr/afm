@@ -11,16 +11,11 @@ import flax.nnx as nnx
 from afm.config import Config
 from afm.datasets.battery import load_battery
 from afm.datasets.eval import evaluate_on_trajectories
+from afm.datasets.run_config import build_afm_config
 from afm.training.data import create_infinite_dataloaders
-from afm.training.trainers import AFMTrainer, FMTrainer
-from afm.models import AutoregressiveFlowMatching, FlowMatching
+from afm.training.trainers import AFMTrainer
+from afm.models import AutoregressiveFlowMatching
 
-def build_config(L, ctx, pred):
-    return Config(system_name="nasa_battery", system_num_timepoints=L,
-                  context_length=ctx, afm_prediction_horizon=1,
-                  fm_prediction_horizon=pred, data_prediction_size=pred,
-                  data_batch_size=64, steps_per_epoch=100,
-                  model_covariates_dim=1, flow_nfe=20, flow_n_samples=50)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -30,13 +25,17 @@ def main():
     ap.add_argument("--univariate", action="store_true")
     args = ap.parse_args()
 
+    # Probe pass to determine the actual trajectory length from the data files.
     ds0 = load_battery(Config(system_name="nasa_battery", system_num_timepoints=80,
                               context_length=30, fm_prediction_horizon=40,
                               data_prediction_size=40),
                        holdout=args.holdout, univariate=args.univariate)
     L = ds0.meta["raw_length"]
     pred = L - args.ctx                       # forecast everything after context
-    cfg = build_config(L, args.ctx, pred)
+
+    cfg = build_afm_config("nasa_battery", length=L, context_length=args.ctx,
+                           forecast_horizon=pred, data_batch_size=64,
+                           steps_per_epoch=100, flow_nfe=20, flow_n_samples=50)
     ds = load_battery(cfg, holdout=args.holdout, univariate=args.univariate)
 
     (afm_train, afm_test), _ = create_infinite_dataloaders(
@@ -56,6 +55,7 @@ def main():
     print(f"[battery holdout={args.holdout}] "
           f"CRPS={res['crps']:.4f} NRMSE={res['nrmse']:.4f} "
           f"capacity_RMSE={res['rmse_orig']:.4f} Ah  MAE={res['mae_orig']:.4f} Ah")
+
 
 if __name__ == "__main__":
     main()

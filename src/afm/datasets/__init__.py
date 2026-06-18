@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from typing import Any, Dict
 import numpy as np
 
+from .run_config import build_afm_config  # noqa: F401  (re-exported for convenience)
+
 REAL_DATASET_NAMES = ("nasa_battery", "cmapss_fd001", "cmapss_fd002", "cmapss_fd003", "cmapss_fd004")
 
 @dataclass

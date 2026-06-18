@@ -1,5 +1,6 @@
 """Render an AFM-vs-published results table for the rebuttal.
-Baseline numbers + protocols are fixed in docs/superpowers/specs/2026-06-18-...-design.md §7.
+Baseline numbers + protocols are fixed in
+docs/superpowers/specs/2026-06-18-real-world-degradation-benchmarks-design.md §7.
 Fill the AFM/FM rows from the script outputs, then render."""
 from __future__ import annotations
 

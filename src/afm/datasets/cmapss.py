@@ -86,7 +86,8 @@ def load_cmapss_rul(config, subset="FD001", data_dir="data/cmapss",
     if length is None:
         length = int(min(len(u) for u in train_units))
     ctx = config.context_length
-    train_hi = np.stack([project_hi(u, axis)[:length] for u in train_units
+    # Use TRAILING windows so training matches the late-life regime seen at test time.
+    train_hi = np.stack([project_hi(u, axis)[-length:] for u in train_units
                          if len(u) >= length])[..., None].astype(np.float32)  # (n,L,1)
 
     test_units = [sensor_scaler.transform(g[SENSOR_COLS].to_numpy(float))

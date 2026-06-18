@@ -24,6 +24,8 @@ def discharge_features(cycles: list[dict]) -> np.ndarray:
             float(np.max(np.asarray(d["Time"], dtype=float))),
             float(np.mean(np.asarray(d["Temperature_measured"], dtype=float))),
         ])
+    if not rows:
+        return np.empty((0, 4), dtype=np.float64)
     return np.asarray(rows, dtype=np.float64)
 
 def _load_cell_features(mat_path: str, cell: str) -> np.ndarray:
@@ -36,7 +38,8 @@ def _load_cell_features(mat_path: str, cell: str) -> np.ndarray:
 def load_battery(config, cells=("B0005", "B0006", "B0007", "B0018"),
                  holdout="B0018", univariate=False, data_dir="data/battery") -> RealDataset:
     cells = list(cells)
-    assert holdout in cells, f"holdout {holdout} not in {cells}"
+    if holdout not in cells:
+        raise ValueError(f"holdout {holdout!r} not in {cells}")
     paths = ensure_battery_files(cells, data_dir=data_dir)
 
     feats = {c: _load_cell_features(paths[c], c) for c in cells}
