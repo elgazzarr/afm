@@ -75,3 +75,20 @@ def test_parse_and_build_trajectories(tmp_path):
 
     arr = build_trajectories(df, SENSOR_COLS, length=4)
     assert arr.shape == (2, 4, len(SENSOR_COLS))   # both units kept, truncated to 4
+
+import numpy as np
+from afm.datasets.cmapss import nasa_score, derive_rul
+
+def test_nasa_score_asymmetric():
+    # late prediction (d>0) penalized by exp(d/10)-1; early (d<0) by exp(-d/13)-1
+    assert np.isclose(nasa_score(np.array([10]), np.array([10])), 0.0)
+    late = nasa_score(np.array([20]), np.array([10]))   # d=+10
+    early = nasa_score(np.array([0]), np.array([10]))    # d=-10
+    assert np.isclose(late, np.exp(10/10) - 1, atol=1e-6)
+    assert np.isclose(early, np.exp(10/13) - 1, atol=1e-6)
+    assert late > early    # late predictions penalized harder
+
+def test_derive_rul_threshold_crossing():
+    hi = np.array([0.0, 0.2, 0.4, 0.6, 0.9, 1.2])   # crosses 1.0 at index 5
+    assert derive_rul(hi, threshold=1.0, cap=125) == 5
+    assert derive_rul(np.zeros(10), threshold=1.0, cap=7) == 7   # never crosses -> cap

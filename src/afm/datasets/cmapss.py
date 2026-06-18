@@ -40,3 +40,28 @@ def load_cmapss(config, subset="FD001", data_dir="data/cmapss",
     covariates = np.linspace(0.0, 1.0, length).astype(np.float32)
     meta = {"scaler": scaler, "sensor_cols": SENSOR_COLS, "subset": subset, "length": length}
     return RealDataset(train_traj, test_traj, covariates, train_traj.shape[-1], meta)
+
+def nasa_score(rul_pred: np.ndarray, rul_true: np.ndarray) -> float:
+    d = np.asarray(rul_pred, dtype=float) - np.asarray(rul_true, dtype=float)
+    s = np.where(d < 0, np.exp(-d / 13.0) - 1.0, np.exp(d / 10.0) - 1.0)
+    return float(np.sum(s))
+
+def fit_health_index(train_units: list[np.ndarray]) -> np.ndarray:
+    """PCA first component over pooled (z-scored) sensor rows; oriented so HI rises toward failure."""
+    pooled = np.concatenate([u for u in train_units], axis=0)      # (sum_T, dim)
+    pooled = pooled - pooled.mean(axis=0)
+    _, _, vt = np.linalg.svd(pooled, full_matrices=False)
+    axis = vt[0]
+    # Orient: HI should increase from start to end of a run-to-failure trajectory.
+    end_minus_start = np.mean([u[-1] @ axis - u[0] @ axis for u in train_units])
+    if end_minus_start < 0:
+        axis = -axis
+    return axis
+
+def project_hi(seq: np.ndarray, axis: np.ndarray) -> np.ndarray:
+    return np.asarray(seq, dtype=float) @ axis
+
+def derive_rul(hi_forecast: np.ndarray, threshold: float, cap: int = 125) -> int:
+    crossed = np.where(np.asarray(hi_forecast) >= threshold)[0]
+    rul = int(crossed[0]) if crossed.size else len(hi_forecast)
+    return min(rul, cap)
