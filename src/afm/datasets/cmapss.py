@@ -65,3 +65,37 @@ def derive_rul(hi_forecast: np.ndarray, threshold: float, cap: int = 125) -> int
     crossed = np.where(np.asarray(hi_forecast) >= threshold)[0]
     rul = int(crossed[0]) if crossed.size else len(hi_forecast)
     return min(rul, cap)
+
+
+def load_cmapss_rul(config, subset="FD001", data_dir="data/cmapss",
+                    length: int | None = None) -> dict:
+    paths = ensure_cmapss_files(subset, data_dir=data_dir)
+    train_df = parse_cmapss(paths["train"])
+    test_df = parse_cmapss(paths["test"])
+    rul_true = np.loadtxt(paths["rul"]).astype(float).ravel()
+
+    # z-score sensors using train stats
+    train_units = [g[SENSOR_COLS].to_numpy(float)
+                   for _, g in train_df.sort_values(["unit", "cycle"]).groupby("unit")]
+    sensor_scaler = Scaler().fit(np.concatenate(train_units, axis=0))
+    train_units = [sensor_scaler.transform(u) for u in train_units]
+
+    axis = fit_health_index(train_units)
+    thr = float(np.mean([project_hi(u, axis)[-1] for u in train_units]))  # mean end-of-life HI
+
+    if length is None:
+        length = int(min(len(u) for u in train_units))
+    ctx = config.context_length
+    train_hi = np.stack([project_hi(u, axis)[:length] for u in train_units
+                         if len(u) >= length])[..., None].astype(np.float32)  # (n,L,1)
+
+    test_units = [sensor_scaler.transform(g[SENSOR_COLS].to_numpy(float))
+                  for _, g in test_df.sort_values(["unit", "cycle"]).groupby("unit")]
+    test_hi_context = np.stack(
+        [project_hi(u, axis)[-ctx:] if len(u) >= ctx
+         else np.pad(project_hi(u, axis), (ctx - len(u), 0), mode="edge")
+         for u in test_units])[..., None].astype(np.float32)               # (n_test,ctx,1)
+
+    return {"train_hi": train_hi, "test_hi_context": test_hi_context,
+            "rul_true": rul_true, "threshold": thr, "hi_axis": axis,
+            "sensor_scaler": sensor_scaler}

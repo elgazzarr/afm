@@ -93,6 +93,17 @@ def test_derive_rul_threshold_crossing():
     assert derive_rul(hi, threshold=1.0, cap=125) == 5
     assert derive_rul(np.zeros(10), threshold=1.0, cap=7) == 7   # never crosses -> cap
 
+import numpy as np
+from afm.datasets.cmapss import fit_health_index, project_hi
+
+def test_health_index_orientation_rises_to_failure():
+    # Two synthetic run-to-failure units whose sensors drift upward over time.
+    u1 = np.cumsum(np.ones((20, 14)), axis=0) + np.random.RandomState(0).randn(20, 14) * 0.01
+    u2 = np.cumsum(np.ones((25, 14)), axis=0) + np.random.RandomState(1).randn(25, 14) * 0.01
+    axis = fit_health_index([u1, u2])
+    hi = project_hi(u1, axis)
+    assert hi[-1] > hi[0]    # HI increases toward failure
+
 import jax.numpy as jnp, jax.random as jr, numpy as np
 from afm.datasets import RealDataset
 from afm.datasets.scaling import Scaler
