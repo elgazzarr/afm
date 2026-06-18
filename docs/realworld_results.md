@@ -92,3 +92,49 @@ Plots: `results/realworld/cmapss_FD001_{calibration,crps}_vs_horizon.png`.
 forecaster (lower CRPS + better-calibrated PIs to ~step 60) and better captures cross-channel
 dependence; whole-window FM only overtakes at very long horizons where AR error accumulates.
 Compete on horizon-resolved calibration + dependence, not aggregate point accuracy.
+
+## 6. Multi-seed robustness (3 seeds, mean ± std)
+
+Each seed = independent AFM + FM training (model init, training noise, sampling).
+Data window-sampling order is fixed across seeds; variation reflects optimization +
+sampling. Plots: `results/realworld/*_{calibration,crps}_vs_horizon_ms.png` (seed-averaged,
+±std band); raw per-seed numbers in `results/realworld/*_multiseed.json`.
+
+**C-MAPSS FD001 (ctx=20, H=108)**
+
+| metric | AFM | FM |
+|---|---|---|
+| CRPS | 0.1825 ± 0.0047 | 0.1792 ± 0.0032 |
+| NRMSE | 0.718 ± 0.016 | 0.685 ± 0.008 |
+| coverage@50% | 0.435 ± 0.020 | 0.435 ± 0.013 |
+| coverage@90% | 0.810 ± 0.019 | 0.842 ± 0.013 |
+| **corr-matrix dist** | **1.841 ± 0.227** | 2.410 ± 0.258 |
+
+- **Stable AFM wins:** (i) near/mid-horizon CRPS (the seed-averaged CRPS-vs-horizon bands are
+  separated for steps ~1–55, AFM below), and (ii) cross-sensor dependence (corr distance
+  1.84 vs 2.41, gap exceeds the ±std). Both survive multi-seed scrutiny.
+- Aggregate CRPS/NRMSE: tie within noise (horizon profile averages out). Long horizon: FM wins
+  (AFM rollout drift). Aggregate cov90 marginally favors FM.
+
+**Battery B0007 (ctx=66, H=66)**
+
+| metric | AFM | FM |
+|---|---|---|
+| CRPS | 0.312 ± 0.007 | **0.230 ± 0.008** |
+| NRMSE | 0.773 ± 0.065 | **0.498 ± 0.007** |
+| capacity RMSE (Ah) | 0.101 ± 0.005 | **0.034 ± 0.002** |
+| coverage@90% | 0.135 ± 0.032 | **0.533 ± 0.050** |
+| corr-matrix dist | 0.716 ± 0.004 | 1.457 ± 0.913 |
+
+- **FM dominates battery on accuracy AND calibration, robustly.** AFM is severely overconfident
+  on smooth monotonic decay (cov90 ≈ 0.14 vs nominal 0.90, across the whole horizon — no crossover).
+  The only AFM-lower number is corr distance, but battery's 4 channels co-vary trivially and FM's
+  value has huge variance (±0.91), so it is not a meaningful win.
+
+### Consolidated verdict
+- **Use C-MAPSS as the AFM showcase:** AFM is the better *near-to-mid-horizon multivariate
+  probabilistic* forecaster and better captures the *joint dependence* — both seed-stable, and
+  both are reviewer-requested diagnostics.
+- **Do not feature battery as an AFM win.** It robustly favors FM and exposes AFM over-confidence
+  on smooth low-noise series. Present it as the FM-favorable / known-limitation case (consistent
+  with the synthetic Van der Pol result), ideally in an appendix.
