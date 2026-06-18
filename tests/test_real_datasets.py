@@ -35,3 +35,23 @@ def test_ensure_battery_files_raises_with_instructions_when_absent(tmp_path):
     msg = str(e.value)
     assert "B0005.mat" in msg
     assert "http" in msg  # an actionable URL is present
+
+from afm.datasets.battery import discharge_features
+
+def _fake_cycles():
+    # Two discharge cycles + one charge cycle (charge must be ignored).
+    def disc(cap, v, temp, n=5):
+        return {"type": "discharge",
+                "data": {"Capacity": np.array([cap]),
+                         "Voltage_measured": np.full(n, v),
+                         "Temperature_measured": np.full(n, temp),
+                         "Time": np.arange(n) * 10.0}}
+    return [disc(1.85, 3.9, 24.0), {"type": "charge", "data": {}}, disc(1.80, 3.8, 25.0)]
+
+def test_discharge_features_extracts_capacity_and_ignores_charge():
+    feats = discharge_features(_fake_cycles())
+    assert feats.shape == (2, 4)              # 2 discharge cycles, 4 features
+    assert np.isclose(feats[0, 0], 1.85)       # capacity column
+    assert np.isclose(feats[1, 0], 1.80)
+    assert np.isclose(feats[0, 2], 40.0)       # discharge_time = max Time = 4*10
+    assert np.isclose(feats[0, 3], 24.0)       # mean temp
