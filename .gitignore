@@ -40,3 +40,5 @@ rebuttal/
 
 # Jupyter
 .ipynb_checkpoints/
+
+data/

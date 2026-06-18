@@ -119,9 +119,11 @@ class Config:
         if self.data_n_train_test_samples <= 0:
             raise ValueError(f"n_train_test_samples ({self.data_n_train_test_samples}) must be positive")
 
-        # System validation
-        valid_systems = ['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator',
-                        'brusselator', 'fitzhugh_nagumo', 'duffing']
+        # System validation (synthetic dynamical systems + real datasets)
+        synthetic_systems = ['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator',
+                             'brusselator', 'fitzhugh_nagumo', 'duffing']
+        real_datasets = ['nasa_battery', 'cmapss_fd001', 'cmapss_fd002', 'cmapss_fd003', 'cmapss_fd004']
+        valid_systems = synthetic_systems + real_datasets
         if self.system_name not in valid_systems:
             raise ValueError(f"Invalid system '{self.system_name}'. Valid options: {valid_systems}")
 
@@ -142,9 +144,11 @@ class Config:
         self.dt = (self.ts[1] - self.ts[0]) / 5
 
     def get_system_choices(self) -> List[str]:
-        """Get list of available dynamical systems."""
-        return ['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator',
-                'brusselator', 'fitzhugh_nagumo', 'duffing']
+        """Get list of available dynamical systems and real datasets."""
+        synthetic_systems = ['lorenz', 'lotka_volterra', 'vanderpol', 'harmonic_oscillator',
+                             'brusselator', 'fitzhugh_nagumo', 'duffing']
+        real_datasets = ['nasa_battery', 'cmapss_fd001', 'cmapss_fd002', 'cmapss_fd003', 'cmapss_fd004']
+        return synthetic_systems + real_datasets
 
     def summary(self) -> str:
         """Get a summary of the configuration."""

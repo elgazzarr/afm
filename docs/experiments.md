@@ -33,6 +33,13 @@ afm run afm_vs_fm_single --system vanderpol --num-epochs 100
 afm validate afm_vs_fm_single
 ```
 
+Real-world dataset evaluations are run directly via Python scripts:
+
+```bash
+python examples/realworld_battery.py      # Battery capacity fade forecasting
+python examples/realworld_cmapss.py       # Engine RUL prediction
+```
+
 ## Configuration Structure
 
 Each experiment configuration follows this structure:

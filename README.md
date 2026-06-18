@@ -68,6 +68,15 @@ samples = model.sample(
 
 All systems support both deterministic and stochastic (SDE) modes via `create_system(name, stochastic=True/False)`.
 
+## Real-world datasets
+
+AFM includes scripts to evaluate on two real-world datasets for degradation and failure prediction:
+
+- `examples/realworld_battery.py`: Battery capacity fade forecasting on NASA battery cycles.
+- `examples/realworld_cmapss.py`: Engine remaining useful life (RUL) prediction on NASA C-MAPSS data.
+
+Raw data should be placed in the `data/` directory. Data URLs and acquisition instructions are documented in `src/afm/datasets/download.py`. Evaluation is CPU-only (no GluonTS or GPU required).
+
 ## CLI for Paper Experiments
 
 The package includes a CLI for reproducing the experiments from the paper:
