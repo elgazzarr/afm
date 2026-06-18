@@ -36,6 +36,7 @@ Thumbs.db
 results/
 outputs/
 wandb/
+rebuttal/
 
 # Jupyter
 .ipynb_checkpoints/

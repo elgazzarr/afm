@@ -21,10 +21,17 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "jax>=0.4",
-    "jaxlib>=0.4",
-    "flax>=0.8",
+    # jax>=0.8.2 removed the `abstracted_axes` argument that flax 0.10.x's
+    # nnx.jit passes to jax.jit, so it must stay below that.
+    "jax>=0.4.27,<0.8.2",
+    "jaxlib>=0.4.27,<0.8.2",
+    # flax 0.11 made nnx.Optimizer's `wrt` required and changed update() to
+    # update(model, grads); the trainers use the 0.10.x API.
+    "flax>=0.10,<0.11",
     "diffrax>=0.5",
+    # lineax>=0.1 (a transitive diffrax dep) requires jax>=0.10, conflicting
+    # with the jax cap above.
+    "lineax<0.1",
     "optax>=0.2",
     "jax-dataloader>=0.1",
     "pyyaml>=6.0",
