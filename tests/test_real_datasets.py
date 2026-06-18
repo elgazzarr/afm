@@ -130,3 +130,15 @@ def test_evaluate_on_trajectories_oracle_is_near_zero():
     out = evaluate_on_trajectories(model, ds, _Cfg, jr.PRNGKey(0), n_steps_pred=6, n_samples=5)
     assert out["nrmse"] < 1e-3
     assert out["rmse_orig"] < 1e-2
+
+from afm.datasets.results_table import render_results_table
+
+def test_render_results_table_latex_includes_protocol_column():
+    rows = [{"method": "AFM (ours)", "dataset": "FD001", "metric": "RUL-RMSE",
+             "value": "13.x", "protocol": "cap=125, HI-threshold"},
+            {"method": "DCNN (Li 2018)", "dataset": "FD001", "metric": "RUL-RMSE",
+             "value": "12.61", "protocol": "cap=125, w=30"}]
+    out = render_results_table(rows, fmt="latex")
+    assert "protocol" in out.lower()
+    assert "DCNN (Li 2018)" in out and "12.61" in out
+    assert out.strip().startswith("\\begin{tabular}")

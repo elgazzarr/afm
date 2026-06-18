@@ -31,6 +31,10 @@ afm run afm_vs_fm_single --system vanderpol --num-epochs 100
 
 # Validate configuration without running
 afm validate afm_vs_fm_single
+
+# Run real-world dataset evaluations
+python examples/realworld_battery.py      # Battery capacity fade forecasting
+python examples/realworld_cmapss.py       # Engine RUL prediction
 ```
 
 ## Configuration Structure
