@@ -55,3 +55,23 @@ def test_discharge_features_extracts_capacity_and_ignores_charge():
     assert np.isclose(feats[1, 0], 1.80)
     assert np.isclose(feats[0, 2], 40.0)       # discharge_time = max Time = 4*10
     assert np.isclose(feats[0, 3], 24.0)       # mean temp
+
+import numpy as np, pandas as pd
+from afm.datasets.cmapss import parse_cmapss, build_trajectories, SENSOR_COLS
+
+def test_parse_and_build_trajectories(tmp_path):
+    # 2 units; unit 1 has 6 cycles, unit 2 has 4 cycles. 26 columns total.
+    rows = []
+    for unit, ncyc in [(1, 6), (2, 4)]:
+        for c in range(1, ncyc + 1):
+            rows.append([unit, c] + [0.0, 0.0, 0.0] + [float(c)] * 21)
+    txt = "\n".join(" ".join(str(v) for v in r) for r in rows) + "\n"
+    p = tmp_path / "train_FD001.txt"; p.write_text(txt)
+
+    df = parse_cmapss(str(p))
+    assert list(df.columns)[:2] == ["unit", "cycle"]
+    assert df.shape == (10, 26)
+    assert set(SENSOR_COLS).issubset(df.columns)
+
+    arr = build_trajectories(df, SENSOR_COLS, length=4)
+    assert arr.shape == (2, 4, len(SENSOR_COLS))   # both units kept, truncated to 4
