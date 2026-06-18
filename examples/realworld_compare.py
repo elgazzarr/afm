@@ -81,6 +81,9 @@ def main():
     ap.add_argument("--fm-epoch-mult", type=int, default=2,
                     help="FM trains for epochs*mult (FM needs more, per the paper).")
     ap.add_argument("--plot-dir", default=None)
+    ap.add_argument("--diagnostics", action="store_true",
+                    help="Compute calibration (PI coverage), horizon-wise CRPS/NRMSE, and "
+                         "cross-channel correlation; save calibration/horizon plots.")
     args = ap.parse_args()
 
     ds, cfg, H, ch, chname, tag = load_problem(args)
@@ -95,7 +98,7 @@ def main():
     FMTrainer(fm, learning_rate=cfg.training_learning_rate, model_name="FM").train(
         fm_train, fm_test, num_epochs=args.epochs * args.fm_epoch_mult, use_wandb=False)
 
-    want_pred = args.plot_dir is not None
+    want_pred = (args.plot_dir is not None) or args.diagnostics
     a = evaluate_on_trajectories(afm, ds, cfg, jr.PRNGKey(42), n_steps_pred=H,
                                  n_samples=cfg.flow_n_samples, nfe=cfg.flow_nfe,
                                  channel=ch, return_predictions=want_pred)
@@ -109,7 +112,7 @@ def main():
     for name, r in (("AFM", ares), ("FM", fres)):
         print(f"{name:<5}{r['crps']:>10.4f}{r['nrmse']:>10.4f}{r['rmse_orig']:>12.4f}{r['mae_orig']:>10.4f}")
 
-    if want_pred:
+    if args.plot_dir is not None:
         from afm.datasets.plots import save_forecast_plot
         os.makedirs(args.plot_dir, exist_ok=True)
         safe = tag.replace("/", "_")
@@ -119,6 +122,50 @@ def main():
             save_forecast_plot(ds, preds, gt, cfg, path, channel=ch, channel_name=chname,
                                title=f"{name} forecast — {tag}")
             print(f"  saved plot: {path}")
+
+    if args.diagnostics:
+        _run_diagnostics(a, f, tag, args.plot_dir or "results/realworld")
+
+
+def _run_diagnostics(a, f, tag, out_dir):
+    """Calibration (PI coverage), horizon-wise CRPS, and cross-channel correlation."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from afm.datasets.diagnostics import summarize
+
+    sa = summarize(a[1], a[2]); sf = summarize(f[1], f[2])
+    print(f"\n--- diagnostics | {tag} ---")
+    print(f"{'metric':<22}{'AFM':>12}{'FM':>12}{'nominal':>10}")
+    print(f"{'coverage@50%':<22}{sa['coverage'][0.5]:>12.3f}{sf['coverage'][0.5]:>12.3f}{0.50:>10.2f}")
+    print(f"{'coverage@90%':<22}{sa['coverage'][0.9]:>12.3f}{sf['coverage'][0.9]:>12.3f}{0.90:>10.2f}")
+    cda = "n/a" if sa['corr_distance'] is None else f"{sa['corr_distance']:.3f}"
+    cdf = "n/a" if sf['corr_distance'] is None else f"{sf['corr_distance']:.3f}"
+    print(f"{'corr-matrix dist':<22}{cda:>12}{cdf:>12}{'0 (best)':>10}")
+
+    os.makedirs(out_dir, exist_ok=True)
+    safe = tag.replace("/", "_")
+    H = len(sa["crps_h"])
+    steps = range(1, H + 1)
+
+    # Calibration vs horizon (90% interval): closeness to the nominal 0.9 line is the win.
+    plt.close(); plt.figure(figsize=(8, 5))
+    plt.plot(steps, sa["coverage_per_h"][0.9], label="AFM")
+    plt.plot(steps, sf["coverage_per_h"][0.9], label="FM")
+    plt.axhline(0.9, ls="--", color="k", lw=1, label="nominal 0.9")
+    plt.xlabel("forecast step"); plt.ylabel("90% PI empirical coverage")
+    plt.title(f"Calibration vs horizon — {tag}"); plt.legend(); plt.ylim(0, 1.05)
+    p1 = os.path.join(out_dir, f"{safe}_calibration_vs_horizon.png")
+    plt.savefig(p1, bbox_inches="tight"); print(f"  saved plot: {p1}")
+
+    # Horizon-wise CRPS.
+    plt.close(); plt.figure(figsize=(8, 5))
+    plt.plot(steps, sa["crps_h"], label="AFM")
+    plt.plot(steps, sf["crps_h"], label="FM")
+    plt.xlabel("forecast step"); plt.ylabel("CRPS")
+    plt.title(f"Horizon-wise CRPS — {tag}"); plt.legend()
+    p2 = os.path.join(out_dir, f"{safe}_crps_vs_horizon.png")
+    plt.savefig(p2, bbox_inches="tight"); print(f"  saved plot: {p2}")
 
 
 if __name__ == "__main__":

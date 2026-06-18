@@ -70,3 +70,25 @@ RUL regressor — present RUL strictly as proof-of-concept, or omit it.
 - FM got 2× training epochs — note the compute asymmetry (paper's protocol) or equalize.
 - C-MAPSS forecasting has **no external baseline** (the literature is RUL); report as internal
   AFM-vs-FM-vs-naive only.
+
+## 5. Diagnostics — where AFM actually wins (C-MAPSS FD001, ctx=20, H=108)
+
+Horizon-resolved analysis (the aggregate CRPS tie hides this):
+
+| diagnostic | AFM | FM | nominal/best |
+|---|---|---|---|
+| coverage@50% (overall) | 0.417 | 0.421 | 0.50 |
+| coverage@90% (overall) | 0.794 | 0.830 | 0.90 |
+| cross-sensor corr-matrix distance | **1.747** | 2.558 | 0 |
+
+- **Near/mid horizon (steps 1–~60): AFM wins** — lower CRPS and 90% coverage closer to nominal.
+- **Long horizon (>~60): FM wins** — AFM rollout drifts and turns overconfident (coverage → ~0.6).
+- **AFM reproduces the multivariate dependence structure better** (corr distance 1.75 vs 2.56) —
+  the reviewer-requested "joint distribution" diagnostic.
+
+Plots: `results/realworld/cmapss_FD001_{calibration,crps}_vs_horizon.png`.
+
+**Defensible AFM argument:** AFM is the stronger *near-to-mid-horizon multivariate probabilistic*
+forecaster (lower CRPS + better-calibrated PIs to ~step 60) and better captures cross-channel
+dependence; whole-window FM only overtakes at very long horizons where AR error accumulates.
+Compete on horizon-resolved calibration + dependence, not aggregate point accuracy.

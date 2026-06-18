@@ -218,3 +218,27 @@ def test_realworld_pipeline_end_to_end():
     assert all(math.isfinite(v) for v in metrics.values()), (
         f"Non-finite metric(s): {metrics}"
     )
+
+
+def test_diagnostics_coverage_horizonwise_correlation():
+    from afm.datasets.diagnostics import coverage, horizonwise, correlation_distance
+    rng = np.random.RandomState(0)
+    S, B, H, D = 200, 4, 3, 2
+    preds = rng.randn(S, B, H, D)               # samples ~ N(0,1)
+
+    # gt at the center of the predictive dist -> always inside the interval.
+    ov_in, per_h = coverage(preds, np.zeros((B, H, D)), level=0.9)
+    assert ov_in > 0.8 and per_h.shape == (H,)
+    # gt far outside -> essentially never covered.
+    ov_out, _ = coverage(preds, np.full((B, H, D), 10.0), level=0.9)
+    assert ov_out < 0.1
+
+    crps_h, nrmse_h = horizonwise(preds, np.zeros((B, H, D)))
+    assert crps_h.shape == (H,) and nrmse_h.shape == (H,)
+
+    # preds identical to (broadcast) gt -> matching correlation structure.
+    gt2 = rng.randn(B, H, D)
+    d = correlation_distance(np.broadcast_to(gt2[None], (S, B, H, D)), gt2)
+    assert d is not None and d < 1e-6
+    # univariate -> no cross-channel correlation defined.
+    assert correlation_distance(preds[..., :1], np.zeros((B, H, 1))) is None
