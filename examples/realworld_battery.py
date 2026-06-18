@@ -23,6 +23,8 @@ def main():
     ap.add_argument("--holdout", default="B0018")
     ap.add_argument("--ctx", type=int, default=30)
     ap.add_argument("--univariate", action="store_true")
+    ap.add_argument("--plot-dir", default=None,
+                    help="If set, save a capacity forecast-sample plot here.")
     args = ap.parse_args()
 
     # Probe pass to determine the actual trajectory length from the data files.
@@ -49,12 +51,26 @@ def main():
     AFMTrainer(model, learning_rate=cfg.training_learning_rate, model_name="AFM").train(
         afm_train, afm_test, num_epochs=args.epochs, use_wandb=False)
 
-    res = evaluate_on_trajectories(model, ds, cfg, jr.PRNGKey(42),
+    cap_idx = ds.meta["capacity_index"]
+    out = evaluate_on_trajectories(model, ds, cfg, jr.PRNGKey(42),
                                    n_steps_pred=pred, n_samples=cfg.flow_n_samples,
-                                   nfe=cfg.flow_nfe, channel=ds.meta["capacity_index"])
+                                   nfe=cfg.flow_nfe, channel=cap_idx,
+                                   return_predictions=args.plot_dir is not None)
+    res = out[0] if args.plot_dir is not None else out
     print(f"[battery holdout={args.holdout}] "
           f"CRPS={res['crps']:.4f} NRMSE={res['nrmse']:.4f} "
           f"capacity_RMSE={res['rmse_orig']:.4f} Ah  MAE={res['mae_orig']:.4f} Ah")
+
+    if args.plot_dir is not None:
+        import os
+        from afm.datasets.plots import save_forecast_plot
+        _, preds, gt = out
+        os.makedirs(args.plot_dir, exist_ok=True)
+        path = os.path.join(args.plot_dir, f"battery_{args.holdout}_capacity.png")
+        save_forecast_plot(ds, preds, gt, cfg, path, channel=cap_idx,
+                           channel_name="capacity (Ah)",
+                           title=f"AFM capacity-fade forecast — holdout {args.holdout}")
+        print(f"  saved plot: {path}")
 
 
 if __name__ == "__main__":

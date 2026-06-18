@@ -32,6 +32,10 @@ def main():
     ap.add_argument("--subset", default="FD001")
     ap.add_argument("--ctx", type=int, default=20)
     ap.add_argument("--cap", type=int, default=125)
+    ap.add_argument("--plot-dir", default=None,
+                    help="If set, save sensor forecast-sample plots here.")
+    ap.add_argument("--skip-rul", action="store_true",
+                    help="Skip the (slow, weak) RUL track; useful for a fast forecasting/plot run.")
     args = ap.parse_args()
 
     # ---------- (A) multivariate forecasting ----------
@@ -50,9 +54,27 @@ def main():
     fmodel = make_model(ds.data_dim, cfg)
     AFMTrainer(fmodel, learning_rate=cfg.training_learning_rate, model_name="AFM").train(
         afm_train, afm_test, num_epochs=args.epochs, use_wandb=False)
-    fres = evaluate_on_trajectories(fmodel, ds, cfg, jr.PRNGKey(1),
-                                    n_steps_pred=pred, n_samples=cfg.flow_n_samples, nfe=cfg.flow_nfe)
+    fout = evaluate_on_trajectories(fmodel, ds, cfg, jr.PRNGKey(1),
+                                    n_steps_pred=pred, n_samples=cfg.flow_n_samples, nfe=cfg.flow_nfe,
+                                    return_predictions=args.plot_dir is not None)
+    fres = fout[0] if args.plot_dir is not None else fout
     print(f"[cmapss {args.subset} forecasting] CRPS={fres['crps']:.4f} NRMSE={fres['nrmse']:.4f}")
+
+    if args.plot_dir is not None:
+        import os
+        from afm.datasets.plots import save_forecast_plot
+        _, preds, gt = fout
+        os.makedirs(args.plot_dir, exist_ok=True)
+        # Plot two informative sensors for one test engine.
+        for ch in (3, 8):  # indices into the 14-sensor subset
+            sname = ds.meta["sensor_cols"][ch]
+            path = os.path.join(args.plot_dir, f"cmapss_{args.subset}_{sname}.png")
+            save_forecast_plot(ds, preds, gt, cfg, path, channel=ch, channel_name=sname,
+                               title=f"AFM sensor forecast {sname} — C-MAPSS {args.subset}")
+            print(f"  saved plot: {path}")
+
+    if args.skip_rul:
+        return
 
     # ---------- (B) RUL via health-index forecasting ----------
     rul = load_cmapss_rul(cfg, subset=args.subset)

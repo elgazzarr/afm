@@ -61,6 +61,11 @@ def build_afm_config(
     # fm_prediction_horizon must satisfy: length - context_length - fm_ph >= 1
     # i.e. fm_ph <= slack - 1.  Floor at 1.
     fm_prediction_horizon = max(1, slack - 1)
+    # Avoid the value 30: Config._compute_derived_fields treats fm_prediction_horizon==30
+    # as the "unset default" and silently remaps it to data_prediction_size, which would
+    # reintroduce a zero-width FM window. Nudge off the sentinel.
+    if fm_prediction_horizon == 30:
+        fm_prediction_horizon = 29
 
     kwargs = dict(
         system_name=system_name,
