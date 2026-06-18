@@ -157,15 +157,23 @@ class AutoregressiveFlowMatching(BaseFlow):
 
             return jnp.vstack(predictions)
 
-        # Split keys for sampling
-        key_samples = jrandom.split(key, n_samples)
+        # Draw an independent key for every (sample, batch) pair so that each
+        # (sample, batch, step) combination receives its own RNG stream. The
+        # per-step split inside ``predict_single`` then makes the forecast steps
+        # independent as well. (Previously the per-sample key was broadcast
+        # across the batch via ``in_axes=None``, so all series within a sample
+        # index shared the same base-noise path.)
+        batch_size = history.shape[0]
+        key_grid = jrandom.split(key, n_samples * batch_size)
+        key_grid = key_grid.reshape(n_samples, batch_size, *key_grid.shape[1:])
 
-        # Vectorize over samples and batch
-        vmapped_predict = jax.vmap(predict_single, in_axes=(None, 0, 0, None, None))
+        # Vectorize over samples (outer) and batch (inner); the key is now
+        # mapped over the batch axis too.
+        vmapped_predict = jax.vmap(predict_single, in_axes=(0, 0, 0, None, None))
         vmapped_predict = jax.vmap(vmapped_predict, in_axes=(0, None, None, None, None))
 
         pred_samples = vmapped_predict(
-            key_samples, history, covariates, nfe, n_steps_pred
+            key_grid, history, covariates, nfe, n_steps_pred
         )
 
         return pred_samples
