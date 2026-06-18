@@ -92,3 +92,30 @@ def test_derive_rul_threshold_crossing():
     hi = np.array([0.0, 0.2, 0.4, 0.6, 0.9, 1.2])   # crosses 1.0 at index 5
     assert derive_rul(hi, threshold=1.0, cap=125) == 5
     assert derive_rul(np.zeros(10), threshold=1.0, cap=7) == 7   # never crosses -> cap
+
+import jax.numpy as jnp, jax.random as jr, numpy as np
+from afm.datasets import RealDataset
+from afm.datasets.scaling import Scaler
+from afm.datasets.eval import evaluate_on_trajectories
+
+class _OracleModel:
+    """Returns the ground-truth future for every sample -> NRMSE~0."""
+    def __init__(self, test_traj, ctx):
+        self.fut = test_traj[:, ctx:]
+    def sample(self, key, history, covariates, nfe, n_steps_pred, n_samples=50):
+        f = jnp.asarray(self.fut)[:, :n_steps_pred]
+        return jnp.broadcast_to(f[None], (n_samples,) + f.shape)
+
+class _Cfg:  # minimal stand-in for Config fields used by the helper
+    context_length = 4
+
+def test_evaluate_on_trajectories_oracle_is_near_zero():
+    raw = np.cumsum(np.ones((3, 10, 2)), axis=1)   # (n,T,dim)
+    sc = Scaler().fit(raw.reshape(-1, 2))
+    z = sc.transform(raw).astype(np.float32)
+    ds = RealDataset(z, z, np.linspace(0,1,10).astype(np.float32), 2,
+                     {"scaler": sc, "capacity_index": 0})
+    model = _OracleModel(ds.test_traj, _Cfg.context_length)
+    out = evaluate_on_trajectories(model, ds, _Cfg, jr.PRNGKey(0), n_steps_pred=6, n_samples=5)
+    assert out["nrmse"] < 1e-3
+    assert out["rmse_orig"] < 1e-2
