@@ -138,3 +138,29 @@ sampling. Plots: `results/realworld/*_{calibration,crps}_vs_horizon_ms.png` (see
 - **Do not feature battery as an AFM win.** It robustly favors FM and exposes AFM over-confidence
   on smooth low-noise series. Present it as the FM-favorable / known-limitation case (consistent
   with the synthetic Van der Pol result), ideally in an appendix.
+
+## 7. Root-cause fix: sliding covariate window in the AFM rollout (single-seed verification)
+
+**Bug:** `AutoregressiveFlowMatching.sample` froze the covariate/time window at the initial
+context while the state context slid forward during rollout, feeding the model
+`(state, stale-time)` pairs never seen in training -> long-horizon drift + overconfidence.
+**Fix:** slide the covariate window in lockstep using the full context+horizon covariates
+(backward-compatible: context-length-only covariates keep the old frozen behavior, so the
+synthetic-systems path is unchanged). See commit on `fix-afm-covariate-rollout`.
+
+Single-seed before -> after (same protocol):
+
+| dataset | metric | AFM pre-fix | AFM post-fix | FM |
+|---|---|---|---|---|
+| Battery B0007 | NRMSE | 0.740 | **0.555** | 0.467 |
+| | capacity RMSE (Ah) | 0.097 | **0.073** | 0.023 |
+| | cov90 | 0.159 | 0.250 | 0.561 |
+| C-MAPSS FD001 | CRPS | 0.187 | 0.184 | 0.182 |
+| | corr-matrix dist | 1.747 | **1.344** | 2.558 |
+
+- Battery: AFM point accuracy ~25% better; FM still wins smooth monotonic decay; AFM still
+  overconfident (residual exposure-bias issue, not addressed by this fix).
+- C-MAPSS: AFM's cross-sensor dependence advantage strengthened (1.34 vs 2.56).
+- **Residual issue (separate):** multi-step overconfidence — the rollout never sees its own
+  errors in training (single-step teacher forcing), so predictive bands understate accumulated
+  uncertainty. Needs a training-side change (scheduled sampling / multi-step rollout training).
