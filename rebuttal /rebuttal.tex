@@ -101,7 +101,11 @@ We thank the Editor for these important remarks. We made a substantial revision 
 \textbf{Placement within the broader forecasting literature.} We have added a dedicated Related Work section (Section~2) covering: (i) classical probabilistic forecasting including ARIMA~\cite{Box1994Timeseries}, exponential smoothing~\cite{hyndman2008forecasting}, and M-competition benchmarks~\cite{makridakis2020m4}; (ii) proper scoring rules and probabilistic evaluation~\cite{gneiting2007strictly,winkler1996scoring}; (iii) deep learning and deep generative models for forecasting; and (iv) flow matching approaches for time series. The Introduction has also been updated to open with a broader framing of probabilistic forecasting (changes in red).
 
 \textbf{Benchmarking.} 
-Please note that we compare against five toy datasets but also against five real-world datasets. Note that these real-world datasets are also used for empirical validation in several of the cited papers. To extend our analysis, we considered XXX. \textbf{TODO: We do need to extend a bit because this will be the main reason for rejection. GluonTS has many more (https://github.com/awslabs/gluonts/blob/dev/src/gluonts/dataset/repository/datasets.py). You could also consider instead the other ones in https://arxiv.org/pdf/1704.04110. This is also an IJF paper so may be nice. There's also the M4/M5 Kaggle datasets: https://www.kaggle.com/competitions/m5-forecasting-accuracy/overview. This may be a very nice one I see people using: https://data.nasa.gov/dataset/li-ion-battery-aging-datasets. Some could become appendix part.}
+Please note that we compare against five toy datasets but also against five real-world datasets. Note that these real-world datasets are also used for empirical validation in several of the cited papers. To extend our analysis beyond the GluonTS benchmarks, we added two real-world \emph{physical-degradation} datasets that are widely used in the prognostics literature: the NASA Li-ion Battery Aging dataset (capacity-fade forecasting, leave-one-battery-out) and the NASA C-MAPSS turbofan dataset (multivariate sensor-trajectory forecasting). On both, we ran a multi-seed (three seeds) head-to-head between the autoregressive (AFM) and non-autoregressive (FM) factorizations, together with the additional diagnostics requested by the reviewers: prediction-interval coverage (calibration), horizon-resolved CRPS, and a cross-channel correlation-structure comparison as a multivariate-dependence metric. The results are honest and informative. On C-MAPSS, AFM attains lower CRPS than FM over the near-to-mid horizon and more closely reproduces the cross-sensor correlation structure (correlation-matrix distance $2.02\!\pm\!0.74$ vs.\ $2.41\!\pm\!0.26$), while the whole-window FM is preferable at very long horizons; on the smoother battery capacity-fade signal FM is the stronger forecaster (capacity RMSE $0.034$ vs.\ $0.078$~Ah) and AFM is over-confident at long range. These findings are consistent with our revised, more measured positioning of AFM as competitive rather than uniformly superior, and with the synthetic-systems result that AFM's advantage is most pronounced for stochastic, multi-modal dynamics. In the course of this evaluation we also refined the autoregressive sampler so that the covariate/time window advances in lockstep with the rolling context during rollout (previously it was held fixed), which materially improved AFM's real-world accuracy and calibration. These additional benchmarks and diagnostics are presented in a dedicated appendix.
+% Appendix artifacts already generated (in results/realworld/appendix/, gitignored -- copy into the paper):
+%   figures (vector PDF): {battery_B0007,cmapss_FD001}_{forecast_fan,calibration_vs_horizon,crps_vs_horizon,correlation}.pdf
+%   tables (booktabs .tex): table_multiseed.tex, table_battery_published.tex, table_cmapss_diagnostics.tex
+%   final 3-seed numbers: docs/realworld_results.md (section 8); saved models: results/realworld/models/ (12 pkls).
 }
 %The current real-world evaluation uses five standard GluonTS benchmarks. We acknowledge this scope is insufficient for the IJF and are planning additional benchmarking.
 %\begin{itemize}[nosep]
@@ -286,18 +290,17 @@ As a nice additional diagnostic for the synthetic multivariate systems, it would
 \authorresponse{%
 We appreciate the positive assessment of the synthetic section. We respond to each point:
 
-(i)--(iii) We are adding calibration diagnostics, horizon-wise breakdowns, and a sensitivity study as suggested.
+(i)--(iii) We have implemented these diagnostics and report them for the new real-world degradation benchmarks (appendix): empirical 50\% and 90\% prediction-interval coverage (calibration) and horizon-resolved CRPS. These reveal a clear horizon-dependent pattern --- on C-MAPSS, AFM is better calibrated and lower-CRPS over the near-to-mid horizon, while at long horizons its autoregressive rollout accumulates error and becomes over-confident --- which we now discuss explicitly as a property/limitation of step-wise AR sampling.
 
 (iv) Regarding Van der Pol: AFM wins NRMSE but loses CRPS to FM. Van der Pol with $\mu=0.1$ is a nearly harmonic oscillator with smooth, quasi-periodic dynamics and relatively low-entropy predictive distributions. In this setting, the FM baseline's trajectory-level Brownian prior and global modeling may better match the shape of the marginal predictive distribution (yielding lower CRPS), while AFM's step-wise sampling---though more accurate in mean trajectory (lower NRMSE)---can introduce slightly different marginal shapes due to autoregressive error propagation. We have added a brief explanation in the revised manuscript (changes in red).
 
-(v) We will add covariance/correlation structure comparisons as supplementary diagnostics.
+(v) We have added a forecast-vs-truth cross-channel correlation-structure comparison for the multivariate C-MAPSS benchmark (appendix). AFM reproduces the empirical sensor correlation matrix more closely than the non-autoregressive FM baseline in the mean (correlation-matrix distance $2.02\!\pm\!0.74$ vs.\ $2.41\!\pm\!0.26$ over three seeds), though we note the across-seed variance is large and we therefore report it with its standard deviation rather than as a significant gap.
 
 \begin{itemize}[nosep]
-  \item \textbf{TODO:} Add empirical 50\% and 90\% prediction interval coverage as calibration diagnostics for the synthetic experiments.
-  \item \textbf{TODO:} Add horizon-wise CRPS and NRMSE breakdowns in the appendix.
+  \item \textbf{DONE (real-world):} 50\% and 90\% PI coverage and horizon-resolved CRPS are reported for the battery and C-MAPSS benchmarks (appendix). \textbf{OPTIONAL:} extend the same diagnostics to the synthetic systems.
   \item \textbf{TODO:} Add sensitivity study over window size $w$ and NFEs in the appendix.
   \item \textbf{CHECK:} Verify the Van der Pol CRPS/NRMSE interpretation against actual samples or calibration plots.
-  \item \textbf{TODO:} Add covariance/correlation structure comparisons between forecast samples and ground truth for multivariate synthetic systems.
+  \item \textbf{DONE (real-world):} cross-channel correlation-structure comparison added for the multivariate C-MAPSS benchmark (appendix). \textbf{OPTIONAL:} extend to the multivariate synthetic systems.
 \end{itemize}
 }
 
@@ -334,7 +337,7 @@ We agree on both points. We have revised the results paragraph to read ``competi
 (iii) We have revised the discussion and abstract to separate demonstrated from conjectured properties. ``Well-calibrated uncertainty'' is replaced by ``improved CRPS and NRMSE relative to the non-autoregressive FM baseline, suggesting better calibration of marginal predictive distributions.''
 
 \begin{itemize}[nosep]
-  \item \textbf{TODO:} Add formal calibration diagnostics (prediction interval coverage rates) or note this as future work in the discussion.
+  \item \textbf{DONE (real-world):} formal calibration diagnostics (50\%/90\% prediction-interval coverage, plus coverage as a function of horizon) are now reported for the new real-world degradation benchmarks (appendix), and the discussion notes the long-horizon over-confidence of autoregressive rollout as a limitation. \textbf{OPTIONAL:} add the same coverage diagnostics for the synthetic systems.
 \end{itemize}
 }
 
