@@ -13,7 +13,11 @@ import argparse
 import json
 import os
 
+import gc
+import pickle
+
 import numpy as np
+import jax
 import jax.numpy as jnp, jax.random as jr
 import flax.nnx as nnx
 
@@ -55,29 +59,38 @@ def load_problem(args):
     return ds, cfg, H, 0, f"cmapss/{args.subset}"
 
 
-def run_seed(ds, cfg, H, ch, epochs, fm_mult, seed):
-    """Train AFM + FM for one seed; return (afm_record, fm_record) dicts."""
+def _build(kind, ds, cfg, rng_seed):
+    if kind == "AFM":
+        return AutoregressiveFlowMatching(
+            dim_x=ds.data_dim, dim_c=1, dim_h=cfg.model_hidden_dim, dim_t=cfg.model_time_dim,
+            dim_hidden=cfg.model_hidden_dim, hidden_blocks=cfg.model_hidden_blocks,
+            n_rnn_layers=cfg.model_n_rnn_layers, rnn_hidden=cfg.model_rnn_hidden, rngs=nnx.Rngs(rng_seed))
+    return FlowMatching(
+        dim_x=ds.data_dim, dim_c=1, dim_h=cfg.model_hidden_dim, dim_t=cfg.model_time_dim,
+        dim_hidden=cfg.model_hidden_dim, hidden_blocks=cfg.model_hidden_blocks,
+        n_rnn_layers=cfg.model_n_rnn_layers, rngs=nnx.Rngs(rng_seed))
+
+
+def run_seed(ds, cfg, H, ch, epochs, fm_mult, seed, models_dir, safe):
+    """Train (or RESUME from a saved pkl) AFM + FM for one seed; save model state;
+    return (recs, preds_store). Resumable so an OOM/sleep kill doesn't lose finished seeds."""
     (afm_train, afm_test), (fm_train, fm_test) = create_infinite_dataloaders(
         jnp.asarray(ds.train_traj), jnp.asarray(ds.test_traj), jnp.asarray(ds.covariates), cfg)
+    specs = [("AFM", AFMTrainer, epochs, seed, (afm_train, afm_test), 1000 + seed),
+             ("FM", FMTrainer, epochs * fm_mult, seed + 100, (fm_train, fm_test), 2000 + seed)]
 
-    afm = AutoregressiveFlowMatching(
-        dim_x=ds.data_dim, dim_c=1, dim_h=cfg.model_hidden_dim, dim_t=cfg.model_time_dim,
-        dim_hidden=cfg.model_hidden_dim, hidden_blocks=cfg.model_hidden_blocks,
-        n_rnn_layers=cfg.model_n_rnn_layers, rnn_hidden=cfg.model_rnn_hidden, rngs=nnx.Rngs(seed))
-    AFMTrainer(afm, learning_rate=cfg.training_learning_rate, model_name="AFM").train(
-        afm_train, afm_test, num_epochs=epochs, seed=seed, use_wandb=False)
-
-    fm = FlowMatching(
-        dim_x=ds.data_dim, dim_c=1, dim_h=cfg.model_hidden_dim, dim_t=cfg.model_time_dim,
-        dim_hidden=cfg.model_hidden_dim, hidden_blocks=cfg.model_hidden_blocks,
-        n_rnn_layers=cfg.model_n_rnn_layers, rngs=nnx.Rngs(seed + 100))
-    FMTrainer(fm, learning_rate=cfg.training_learning_rate, model_name="FM").train(
-        fm_train, fm_test, num_epochs=epochs * fm_mult, seed=seed + 100, use_wandb=False)
-
-    recs = {}
-    models = {"AFM": afm, "FM": fm}
-    preds_store = {}
-    for name, model, key in (("AFM", afm, 1000 + seed), ("FM", fm, 2000 + seed)):
+    recs = {}; preds_store = {}
+    for name, Trainer, ep, tseed, (tr, te), key in specs:
+        model = _build(name, ds, cfg, tseed)
+        path = os.path.join(models_dir, f"{safe}_{name}_seed{seed}.pkl")
+        if os.path.exists(path):
+            with open(path, "rb") as fh:
+                nnx.update(model, pickle.load(fh))          # resume: reuse trained state
+        else:
+            Trainer(model, learning_rate=cfg.training_learning_rate, model_name=name).train(
+                tr, te, num_epochs=ep, seed=tseed, use_wandb=False)
+            with open(path, "wb") as fh:
+                pickle.dump(nnx.state(model), fh)
         m, preds, gt = evaluate_on_trajectories(
             model, ds, cfg, jr.PRNGKey(key), n_steps_pred=H,
             n_samples=cfg.flow_n_samples, nfe=cfg.flow_nfe, channel=ch, return_predictions=True)
@@ -90,7 +103,8 @@ def run_seed(ds, cfg, H, ch, epochs, fm_mult, seed):
             "cov50_h": s["coverage_per_h"][0.5].tolist(),
         }
         preds_store[name] = (np.asarray(preds), np.asarray(gt))
-    return recs, models, preds_store
+        del model
+    return recs, preds_store
 
 
 def _ms(vals):
@@ -112,7 +126,6 @@ def main():
     ap.add_argument("--out-dir", default="results/realworld")
     args = ap.parse_args()
 
-    import pickle
     ds, cfg, H, ch, tag = load_problem(args)
     safe = tag.replace("/", "_")
     os.makedirs(args.out_dir, exist_ok=True)
@@ -122,14 +135,11 @@ def main():
     seed0_preds = None
     for s in range(args.seeds):
         print(f"[multiseed {tag}] seed {s+1}/{args.seeds} ...", flush=True)
-        recs, models, preds_store = run_seed(ds, cfg, H, ch, args.epochs, args.fm_epoch_mult, s)
+        recs, preds_store = run_seed(ds, cfg, H, ch, args.epochs, args.fm_epoch_mult, s, models_dir, safe)
         per_seed.append(recs)
-        # Save trained model states (nnx state pytree pickles cleanly) for reproducibility.
-        for name, model in models.items():
-            with open(os.path.join(models_dir, f"{safe}_{name}_seed{s}.pkl"), "wb") as fh:
-                pickle.dump(nnx.state(model), fh)
         if s == 0:
             seed0_preds = preds_store
+        jax.clear_caches(); gc.collect()   # relieve memory between seeds (OOM guard)
 
     # Figure-data bundle (seed-0 predictions + de-norm stats) so appendix figures are
     # reproducible without retraining.
