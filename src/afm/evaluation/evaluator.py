@@ -76,15 +76,25 @@ class ModelEvaluator:
 
             # Generate predictions with fresh key for each batch
             key, sample_key = jrandom.split(key)
+            n_steps_pred = (
+                self.config.data_prediction_size +
+                self.config.extrapolation_size
+            )
+            # Covariate-rollout fix: extend the context covariates with the continued
+            # (uniform) time grid so the AFM sampler can slide the covariate window in
+            # lockstep with its rollout instead of freezing it. The time covariate is a
+            # uniform grid, so future steps continue at the same per-step delta. FM uses
+            # only the context slice internally, so this is safe for both models.
+            step = covariates[:, -1:, :] - covariates[:, -2:-1, :]   # (B,1,C) per-step delta
+            offsets = jnp.arange(1, n_steps_pred + 1)[None, :, None]  # (1,H,1)
+            future_cov = covariates[:, -1:, :] + step * offsets       # (B,H,C)
+            full_covariates = jnp.concatenate([covariates, future_cov], axis=1)
             predictions = model.sample(
                 sample_key,
                 history,
-                covariates,
+                full_covariates,
                 nfe=self.nfe,
-                n_steps_pred=(
-                    self.config.data_prediction_size +
-                    self.config.extrapolation_size
-                ),
+                n_steps_pred=n_steps_pred,
                 n_samples=n_samples
             )
 
