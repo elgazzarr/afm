@@ -38,6 +38,15 @@ def horizonwise(preds, gt):
     return crps, nrmse
 
 
+def crps_sum(preds, gt):
+    """CRPS-Sum: the (empirical-CDF) CRPS evaluated on the sum over channels -- an
+    aggregate multivariate score. Uses the same CRPS estimator as the per-channel CRPS,
+    so the two are directly comparable. preds (S,B,H,dim), gt (B,H,dim)."""
+    preds = np.asarray(preds); gt = np.asarray(gt)
+    return float(compute_crps(preds.sum(axis=-1, keepdims=True),
+                              gt.sum(axis=-1, keepdims=True)))
+
+
 def correlation_distance(preds, gt):
     """Frobenius distance between the cross-channel correlation matrix of the
     forecast samples and of the true future (pooled over batch/horizon/samples).
@@ -66,4 +75,5 @@ def summarize(preds, gt, levels=(0.5, 0.9)):
         "crps_h": crps_h,             # (H,)
         "nrmse_h": nrmse_h,           # (H,)
         "corr_distance": correlation_distance(preds, gt),  # float or None
+        "crps_sum": crps_sum(preds, gt),                   # float (aggregate multivariate CRPS)
     }

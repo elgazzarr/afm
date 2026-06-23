@@ -98,7 +98,7 @@ def run_seed(ds, cfg, H, ch, epochs, fm_mult, seed, models_dir, safe):
         recs[name] = {
             "crps": m["crps"], "nrmse": m["nrmse"], "rmse_orig": m["rmse_orig"], "mae_orig": m["mae_orig"],
             "cov50": s["coverage"][0.5], "cov90": s["coverage"][0.9],
-            "corr_dist": s["corr_distance"],
+            "corr_dist": s["corr_distance"], "crps_sum": s["crps_sum"],
             "crps_h": s["crps_h"].tolist(), "cov90_h": s["coverage_per_h"][0.9].tolist(),
             "cov50_h": s["coverage_per_h"][0.5].tolist(),
         }
@@ -155,7 +155,7 @@ def main():
         tag=np.array(tag), sensor_cols=np.array(sensor_cols, dtype=object),
     )
 
-    scalars = ("crps", "nrmse", "rmse_orig", "mae_orig", "cov50", "cov90", "corr_dist")
+    scalars = ("crps", "crps_sum", "nrmse", "rmse_orig", "mae_orig", "cov50", "cov90", "corr_dist")
     agg = {}
     for model in ("AFM", "FM"):
         agg[model] = {k: _ms([r[model][k] for r in per_seed]) for k in scalars}

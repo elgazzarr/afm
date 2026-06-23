@@ -142,8 +142,8 @@ def _pm(ms):
 
 
 def tbl_multiseed(out, data):
-    lines = [r"\begin{tabular}{llcccccc}", r"\toprule",
-             r"Dataset & Model & CRPS & NRMSE & RMSE & cov$_{50}$ & cov$_{90}$ & corr-dist \\",
+    lines = [r"\begin{tabular}{llccccccc}", r"\toprule",
+             r"Dataset & Model & CRPS & CRPS-Sum & NRMSE & RMSE & cov$_{50}$ & cov$_{90}$ & corr-dist \\",
              r"\midrule"]
     for d in DATASETS:
         js = data.get(d["safe"])
@@ -153,7 +153,7 @@ def tbl_multiseed(out, data):
             a = js["aggregate"][model]
             name = d["short"]
             row = (f"{name if model=='AFM' else ''} & {model} & "
-                   f"{_pm(a['crps'])} & {_pm(a['nrmse'])} & {_pm(a['rmse_orig'])} & "
+                   f"{_pm(a['crps'])} & {_pm(a['crps_sum'])} & {_pm(a['nrmse'])} & {_pm(a['rmse_orig'])} & "
                    f"{_pm(a['cov50'])} & {_pm(a['cov90'])} & {_pm(a['corr_dist'])} \\\\")
             lines.append(row)
         lines.append(r"\midrule")
