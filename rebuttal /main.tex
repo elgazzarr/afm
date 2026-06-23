@@ -22,6 +22,13 @@
 \usepackage{adjustbox}
 \usepackage{physics}
 \usepackage{xcolor}
+% --- Revision-highlight toggle -------------------------------------------------
+% All revision markup uses the colour "red". Compiling main.tex gives the
+% HIGHLIGHTED version. To get a CLEAN (non-highlighted) PDF, either compile the
+% wrapper file main_clean.tex, or uncomment the next line:
+% \def\cleanmode{}
+\ifdefined\cleanmode\definecolor{red}{rgb}{0,0,0}\fi  % clean mode: render red as black
+% ------------------------------------------------------------------------------
 
 \begin{document}
 
