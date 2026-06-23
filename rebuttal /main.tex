@@ -515,7 +515,7 @@ Our results, summarized in Table~\ref{table:dynamical_systems}, demonstrate that
 
 Figure~\ref{fig:samples} illustrates the forecasting results for AFM compared to FM by generating future trajectories for four dynamical systems conditioned on observed data. AFM is shown to have much lower variance compared to the FM baseline, even allowing for accurate extrapolation of the dynamics beyond the prediction window it was trained on. These results confirm that modeling the temporal dependencies through autoregressive factorization enables AFM to better capture the underlying dynamics of complex stochastic systems, leading to more accurate predictions and improved uncertainty quantification, especially in challenging extrapolation scenarios.
 
-\subsection{Real-world datasets}
+\subsection{Real-world datasets}\label{subsec:realworld}
 
 \paragraph{Data} We evaluated AFM on the tasks
 of forecasting multiple univariate and multivariate timeseries with different frequencies (hourly and daily) from GluonTS~\citep{alexandrov2020gluonts}. Specifically, we used the following datasets: Electricity~\citep{lai2018modeling}, Solar~\citep{lai2018modeling}, Exchange~\citep{dua2017uci}, Traffic~\citep{dua2017uci}, and Wikipedia~\citep{gasthaus2019probabilistic}. 
@@ -602,11 +602,12 @@ Table~\ref{tab:forecasting} presents the comparison of our proposed AFM model ag
 \paragraph{Efficiency}
 Table~\ref{tab:efficiency} presents the computational efficiency analysis. AFM achieves the best predictive performance with the smallest model size (0.85M parameters compared to 4.1M for TSFlow and 2.8M for TimeGrad). In terms of inference time, AFM requires 180ms per forecast, which is ~4× slower than the non-autoregressive TSFlow (45ms) but significantly faster than the autoregressive diffusion baseline TimeGrad (850ms). \textcolor{red}{We note that AFM and TSFlow use different architectures and implementations, so this comparison should be interpreted as a rough order-of-magnitude characterization rather than a definitive efficiency benchmark. The slower inference of AFM relative to TSFlow reflects the sequential nature of autoregressive sampling and represents a trade-off against the extrapolation and multivariate scaling benefits.} These results demonstrate that the autoregressive flow-matching approach employed in AFM delivers competitive performance across diverse real-world timeseries forecasting tasks, with favorable trade-offs between model size, inference speed, and predictive accuracy.
 
-{\color{red}\paragraph{Additional physical-degradation benchmarks.} To broaden the evaluation beyond standard forecasting corpora, we additionally assess AFM on two physical-degradation datasets widely used in the prognostics literature: the NASA Li-ion Battery Aging dataset (capacity-fade forecasting under a leave-one-battery-out protocol) and the NASA C-MAPSS turbofan dataset (multivariate sensor-trajectory forecasting). We report a three-seed comparison of the autoregressive (AFM) and non-autoregressive (FM) factorizations, together with the calibration (prediction-interval coverage), horizon-resolved CRPS, and cross-channel correlation-structure diagnostics detailed in the appendix. On C-MAPSS, AFM attains lower CRPS than FM over the near-to-mid forecast horizon and reproduces the empirical cross-sensor correlation structure more closely, whereas the whole-window FM is preferable at very long horizons. On the smoother battery capacity-fade signal, where per-step uncertainty is low, the non-autoregressive FM is the stronger and better-calibrated forecaster and AFM tends to be over-confident at long range. These results reinforce our central, measured claim: the autoregressive factorization is most beneficial for stochastic, multi-modal dynamics and near-to-mid horizons, while offering little advantage on smooth, near-deterministic decay where a global non-autoregressive prior suffices.}
-% Appendix figures/tables for this paragraph were generated under results/realworld/appendix/
-% (battery_B0007_*, cmapss_FD001_* PDFs; table_multiseed.tex, table_battery_published.tex,
-% table_cmapss_diagnostics.tex). Add an \appendix section with a \label{app:degradation} and
-% reference it here once the floats are placed.
+{\color{red}\paragraph{Additional physical-degradation benchmarks.} To broaden the evaluation beyond standard forecasting corpora, we additionally assess AFM on two physical-degradation datasets widely used in the prognostics literature: the NASA Li-ion Battery Aging dataset (capacity-fade forecasting under a leave-one-battery-out protocol) and the NASA C-MAPSS turbofan dataset (multivariate sensor-trajectory forecasting). We report a three-seed comparison of the autoregressive (AFM) and non-autoregressive (FM) factorizations, together with the calibration (prediction-interval coverage), horizon-resolved CRPS, and cross-channel correlation-structure diagnostics summarized in Table~\ref{tab:realworld_degradation}; the per-horizon diagnostics and forecast visualizations are provided in \ref{app:degradation}. On the turbofan benchmark, AFM attains lower CRPS than FM over the near-to-mid forecast horizon and reproduces the empirical cross-sensor correlation structure more closely, whereas the whole-window FM is preferable at very long horizons. On the smoother battery capacity-fade signal, where per-step uncertainty is low, the non-autoregressive FM is the stronger and better-calibrated forecaster and AFM tends to be over-confident at long range. These results reinforce our central, measured claim: the autoregressive factorization is most beneficial for stochastic, multi-modal dynamics and near-to-mid horizons, while offering little advantage on smooth, near-deterministic decay where a global non-autoregressive prior suffices.}
+\begin{table*}[t]\centering
+\resizebox{\textwidth}{!}{\input{figures/appendix/table_multiseed.tex}}
+\caption{\textcolor{red}{Multi-seed (three seeds) AFM-vs-FM comparison on the two real-world degradation benchmarks (mean$\pm$std). ``corr-dist'' is the Frobenius distance between the forecast and ground-truth cross-channel correlation matrices (lower is better). Per-horizon calibration/CRPS diagnostics, the cross-sensor correlation maps, and example probabilistic forecasts are provided in \ref{app:degradation}.}}
+\label{tab:realworld_degradation}
+\end{table*}
 
 \section{Discussion}
 In this work, we introduced AFM, a probabilistic forecasting model that combines autoregressive modeling with flow matching to generate accurate and well-calibrated predictions for multivariate timeseries data. By factorizing the forecasting problem into a sequence of conditional distributions, AFM effectively balances the sequential dependencies in temporal data with the expressiveness of flow-based generative modeling.
@@ -716,16 +717,8 @@ Second, computational characteristics diverge significantly: the non-autoregress
 \section{\textcolor{red}{Real-world degradation benchmarks}}\label{app:degradation}
 
 {\color{red}
-To broaden the real-world evaluation beyond the GluonTS benchmarks of the main text, we additionally evaluate AFM on two physical-degradation datasets from the NASA Prognostics Center of Excellence: the Li-ion \emph{Battery Aging} dataset and the \emph{C-MAPSS} turbofan dataset. For Battery we forecast the per-cycle discharge-capacity fade under a leave-one-battery-out protocol (train on three cells, test on a held-out cell; $66$-cycle context, $66$-cycle horizon). For C-MAPSS (subset FD001) we forecast the $14$-sensor multivariate trajectory of held-out engines ($20$-cycle context, $108$-cycle horizon). All values are mean$\pm$std over three random seeds, using the same CRPS/NRMSE pipeline as the main text; we additionally report prediction-interval coverage (calibration), horizon-resolved CRPS, and a cross-channel correlation-structure distance as a multivariate-dependence metric, and we compare the autoregressive (AFM) and non-autoregressive (FM) factorizations head-to-head.
-
-The aggregate comparison is given in Table~\ref{tab:app_multiseed}. On C-MAPSS the two factorizations are comparable in aggregate CRPS, but the horizon-resolved view (Fig.~\ref{fig:app_cmapss_diag}) shows AFM is more accurate and better calibrated over the near-to-mid horizon before the whole-window FM overtakes at long range; AFM also reproduces the empirical cross-sensor correlation structure more closely (Table~\ref{tab:app_cmapss_diag}, Fig.~\ref{fig:app_cmapss_corr}), though with substantial across-seed variance. On the smooth battery capacity-fade signal (Table~\ref{tab:app_battery}, Figs.~\ref{fig:app_battery_fan}--\ref{fig:app_battery_diag}) the non-autoregressive FM is the stronger and better-calibrated forecaster, and AFM is over-confident at long horizons. These results support a measured reading: the autoregressive factorization helps most for stochastic, multi-modal dynamics and near-to-mid horizons, and offers little benefit on smooth, near-deterministic decay.
+This appendix provides the supporting material for the two real-world physical-degradation benchmarks introduced in the main text (Section~\ref{subsec:realworld}): the NASA Li-ion battery (per-cycle discharge-capacity fade, leave-one-battery-out; $66$-cycle context and horizon) and the C-MAPSS turbofan ($14$-sensor multivariate forecasting; $20$-cycle context, $108$-cycle horizon). The aggregate three-seed AFM-vs-FM comparison is reported in the main text (Table~\ref{tab:realworld_degradation}); here we give the per-horizon calibration and CRPS curves, the cross-sensor correlation structure, example probabilistic forecasts, and the supporting accuracy and diagnostic tables.
 }
-
-\begin{table*}[t]\centering
-\resizebox{\textwidth}{!}{\input{figures/appendix/table_multiseed.tex}}
-\caption{\textcolor{red}{Multi-seed AFM-vs-FM comparison on the NASA Battery and C-MAPSS degradation benchmarks (mean$\pm$std over three seeds). ``corr-dist'' is the Frobenius distance between the forecast and ground-truth cross-channel correlation matrices (lower is better).}}
-\label{tab:app_multiseed}
-\end{table*}
 
 \begin{table*}[t]\centering
 \input{figures/appendix/table_battery_published.tex}
@@ -736,39 +729,39 @@ The aggregate comparison is given in Table~\ref{tab:app_multiseed}. On C-MAPSS t
 
 \begin{table*}[t]\centering
 \input{figures/appendix/table_cmapss_diagnostics.tex}
-\caption{\textcolor{red}{C-MAPSS FD001 calibration and dependence diagnostics (three-seed mean$\pm$std).}}
+\caption{\textcolor{red}{C-MAPSS turbofan calibration and dependence diagnostics (three-seed mean$\pm$std).}}
 \label{tab:app_cmapss_diag}
 \end{table*}
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{figures/appendix/cmapss_FD001_forecast_fan.pdf}
-\caption{\textcolor{red}{C-MAPSS FD001: probabilistic sensor-trajectory forecast for one held-out engine, AFM (left) vs.\ FM (right). Shaded context window, ensemble median, $50\%$/$90\%$ prediction intervals, and ground truth.}}
+\caption{\textcolor{red}{C-MAPSS turbofan: probabilistic sensor-trajectory forecast for one held-out engine, AFM (left) vs.\ FM (right). Shaded context window, ensemble median, $50\%$/$90\%$ prediction intervals, and ground truth.}}
 \label{fig:app_cmapss_fan}
 \end{figure*}
 
 \begin{figure*}[t]\centering
 \includegraphics[width=0.49\textwidth]{figures/appendix/cmapss_FD001_calibration_vs_horizon.pdf}\hfill
 \includegraphics[width=0.49\textwidth]{figures/appendix/cmapss_FD001_crps_vs_horizon.pdf}
-\caption{\textcolor{red}{C-MAPSS FD001, three-seed mean$\pm$band. Left: $90\%$ prediction-interval coverage vs.\ forecast horizon (nominal $0.9$ dashed). Right: horizon-resolved CRPS. AFM is better calibrated and lower-CRPS over the near-to-mid horizon; FM overtakes at long range as AFM's rollout accumulates error.}}
+\caption{\textcolor{red}{C-MAPSS turbofan, three-seed mean$\pm$band. Left: $90\%$ prediction-interval coverage vs.\ forecast horizon (nominal $0.9$ dashed). Right: horizon-resolved CRPS. AFM is better calibrated and lower-CRPS over the near-to-mid horizon; FM overtakes at long range as AFM's rollout accumulates error.}}
 \label{fig:app_cmapss_diag}
 \end{figure*}
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{figures/appendix/cmapss_FD001_correlation.pdf}
-\caption{\textcolor{red}{C-MAPSS FD001 cross-sensor correlation matrices: ground truth vs.\ AFM and FM forecast samples (a smaller Frobenius distance to the ground-truth matrix indicates better-captured multivariate dependence).}}
+\caption{\textcolor{red}{C-MAPSS turbofan cross-sensor correlation matrices: ground truth vs.\ AFM and FM forecast samples (a smaller Frobenius distance to the ground-truth matrix indicates better-captured multivariate dependence).}}
 \label{fig:app_cmapss_corr}
 \end{figure*}
 
 \begin{figure*}[t]\centering
 \includegraphics[width=\textwidth]{figures/appendix/battery_B0007_forecast_fan.pdf}
-\caption{\textcolor{red}{NASA Battery (held-out cell B0007): capacity-fade forecast, AFM (left) vs.\ FM (right). FM tracks the smooth decay more accurately and with better-calibrated intervals; AFM drifts low and is over-confident at long range.}}
+\caption{\textcolor{red}{NASA Li-ion battery (held-out cell): capacity-fade forecast, AFM (left) vs.\ FM (right). FM tracks the smooth decay more accurately and with better-calibrated intervals; AFM drifts low and is over-confident at long range.}}
 \label{fig:app_battery_fan}
 \end{figure*}
 
 \begin{figure*}[t]\centering
 \includegraphics[width=0.49\textwidth]{figures/appendix/battery_B0007_calibration_vs_horizon.pdf}\hfill
 \includegraphics[width=0.49\textwidth]{figures/appendix/battery_B0007_crps_vs_horizon.pdf}
-\caption{\textcolor{red}{NASA Battery B0007, three-seed mean$\pm$band: $90\%$ prediction-interval coverage (left) and horizon-resolved CRPS (right). Both methods under-cover on this smooth signal, but AFM is markedly more over-confident.}}
+\caption{\textcolor{red}{NASA Li-ion battery, three-seed mean$\pm$band: $90\%$ prediction-interval coverage (left) and horizon-resolved CRPS (right). Both methods under-cover on this smooth signal, but AFM is markedly more over-confident.}}
 \label{fig:app_battery_diag}
 \end{figure*}
 

@@ -28,10 +28,12 @@ plt.rcParams.update({
 AFM_C, FM_C = "#1f77b4", "#d62728"
 RATED_AH = 2.0  # Li-ion rated capacity, for normalized-SOH conversion
 
-# (tag, safe, headline channel label, x-axis label)
+# Human-readable display names: "short" for table rows, "full" for figure titles/captions.
 DATASETS = [
-    ("battery/B0007", "battery_B0007", "capacity (Ah)", "discharge cycle"),
-    ("cmapss/FD001", "cmapss_FD001", "sensor (normalized)", "engine cycle"),
+    {"tag": "battery/B0007", "safe": "battery_B0007", "short": "Battery",
+     "full": "NASA Li-ion battery", "chlabel": "capacity (Ah)", "xlabel": "discharge cycle"},
+    {"tag": "cmapss/FD001", "safe": "cmapss_FD001", "short": "Turbofan",
+     "full": "C-MAPSS turbofan", "chlabel": "sensor (normalized)", "xlabel": "engine cycle"},
 ]
 
 
@@ -143,13 +145,13 @@ def tbl_multiseed(out, data):
     lines = [r"\begin{tabular}{llcccccc}", r"\toprule",
              r"Dataset & Model & CRPS & NRMSE & RMSE & cov$_{50}$ & cov$_{90}$ & corr-dist \\",
              r"\midrule"]
-    for tag, safe, *_ in DATASETS:
-        js = data.get(safe)
+    for d in DATASETS:
+        js = data.get(d["safe"])
         if not js:
             continue
         for model in ("AFM", "FM"):
             a = js["aggregate"][model]
-            name = tag.split("/")[1]
+            name = d["short"]
             row = (f"{name if model=='AFM' else ''} & {model} & "
                    f"{_pm(a['crps'])} & {_pm(a['nrmse'])} & {_pm(a['rmse_orig'])} & "
                    f"{_pm(a['cov50'])} & {_pm(a['cov90'])} & {_pm(a['corr_dist'])} \\\\")
@@ -168,16 +170,13 @@ def tbl_battery_published(out, data):
     a = js["aggregate"]
     afm_ah, afm_sd = a["AFM"]["rmse_orig"]; fm_ah, fm_sd = a["FM"]["rmse_orig"]
     rows = [
-        ("AFM (ours)", f"${afm_ah:.3f}\\!\\pm\\!{afm_sd:.3f}$", f"{afm_ah/RATED_AH:.3f}",
-         "forecast from ctx, leave-one-battery-out"),
-        ("FM (ours)", f"${fm_ah:.3f}\\!\\pm\\!{fm_sd:.3f}$", f"{fm_ah/RATED_AH:.3f}",
-         "forecast from ctx, leave-one-battery-out"),
-        ("GPR (Richardson et al., 2017)", "--", "$\\approx$0.06--0.08",
-         "forecast future capacity, $\\sim$40-cycle horizon"),
+        ("AFM (ours)", f"${afm_ah:.3f}\\!\\pm\\!{afm_sd:.3f}$", f"{afm_ah/RATED_AH:.3f}"),
+        ("FM (ours)", f"${fm_ah:.3f}\\!\\pm\\!{fm_sd:.3f}$", f"{fm_ah/RATED_AH:.3f}"),
+        ("GPR (Richardson et al., 2017)", "--", "$\\approx$0.06--0.08"),
     ]
-    lines = [r"\begin{tabular}{lccl}", r"\toprule",
-             r"Method & capacity RMSE (Ah) & norm.\ SOH RMSE & Protocol \\", r"\midrule"]
-    lines += [f"{m} & {ah} & {nm} & {pr} \\\\" for m, ah, nm, pr in rows]
+    lines = [r"\begin{tabular}{lcc}", r"\toprule",
+             r"Method & capacity RMSE (Ah) & norm.\ SOH RMSE \\", r"\midrule"]
+    lines += [f"{m} & {ah} & {nm} \\\\" for m, ah, nm in rows]
     lines += [r"\bottomrule", r"\end{tabular}"]
     p = os.path.join(out, "table_battery_published.tex"); open(p, "w").write("\n".join(lines))
     return p
@@ -207,16 +206,17 @@ def main():
     os.makedirs(out, exist_ok=True)
 
     data, fdata = {}, {}
-    for tag, safe, chlabel, xlabel in DATASETS:
+    for d in DATASETS:
+        safe = d["safe"]
         js, fd = _load(args.in_dir, safe)
         if js is None:
             print(f"[skip] missing artifacts for {safe}")
             continue
         data[safe] = js; fdata[safe] = fd
-        print("FIG", fig_forecast_fan(out, tag, safe, chlabel, xlabel, fd))
-        print("FIG", fig_calibration(out, tag, safe, js))
-        print("FIG", fig_crps(out, tag, safe, js))
-        c = fig_correlation(out, tag, safe, fd)
+        print("FIG", fig_forecast_fan(out, d["full"], safe, d["chlabel"], d["xlabel"], fd))
+        print("FIG", fig_calibration(out, d["full"], safe, js))
+        print("FIG", fig_crps(out, d["full"], safe, js))
+        c = fig_correlation(out, d["full"], safe, fd)
         if c:
             print("FIG", c)
     for fn in (tbl_multiseed, tbl_battery_published, tbl_cmapss_diag):
