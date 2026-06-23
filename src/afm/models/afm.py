@@ -135,14 +135,25 @@ class AutoregressiveFlowMatching(BaseFlow):
             predictions = []
             current_history = history
             context_length = history.shape[0]
+            dim_c = covariates.shape[-1]
+            # If the caller supplies covariates spanning context + full horizon, slide the
+            # covariate window in lockstep with the state context so each (state, time) pair
+            # stays consistent with training. Otherwise (context-length covariates only) fall
+            # back to the historical frozen-window behavior for backward compatibility.
+            slide = covariates.shape[0] >= context_length + n_steps_pred
 
-            for _ in range(n_steps_pred):
+            for step in range(n_steps_pred):
                 context = current_history[-context_length:]
+                if slide:
+                    cov_window = jax.lax.dynamic_slice(
+                        covariates, (step, 0), (context_length, dim_c))
+                else:
+                    cov_window = covariates[:context_length]
                 x0 = jrandom.normal(key, shape=context.shape[-1:])
 
                 x_next = dfx.diffeqsolve(
                     term, solver, 0., 1., dt, x0,
-                    args=(context, covariates),
+                    args=(context, cov_window),
                     saveat=dfx.SaveAt(t1=True)
                 ).ys
 

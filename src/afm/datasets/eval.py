@@ -9,8 +9,12 @@ def evaluate_on_trajectories(model, dataset, config, key, n_steps_pred,
     test = jnp.asarray(dataset.test_traj)                  # (B, T, dim)
     B, T, dim = test.shape
     history = test[:, :ctx, :]                              # (B, ctx, dim)
-    cov = jnp.asarray(dataset.covariates)[:ctx]             # (ctx,)
-    cov = jnp.broadcast_to(cov[None, :, None], (B, ctx, 1)) # (B, ctx, 1)
+    # Pass covariates spanning context + horizon so the AFM sampler can slide the
+    # covariate window in lockstep with its rollout (keeps (state, time) pairs
+    # consistent with training). FM internally uses only the context-length slice.
+    cov_len = min(jnp.asarray(dataset.covariates).shape[0], ctx + n_steps_pred)
+    cov = jnp.asarray(dataset.covariates)[:cov_len]         # (cov_len,)
+    cov = jnp.broadcast_to(cov[None, :, None], (B, cov_len, 1))  # (B, cov_len, 1)
 
     gt = test[:, ctx:ctx + n_steps_pred, :]                 # (B, H, dim)
     preds = model.sample(key, history, cov, nfe=nfe,

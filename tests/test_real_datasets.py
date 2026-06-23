@@ -220,6 +220,33 @@ def test_realworld_pipeline_end_to_end():
     )
 
 
+def test_afm_sampler_slides_covariates_and_is_backward_compatible():
+    """AFM.sample accepts a full (context+horizon) covariate window and slides it,
+    AND still works with context-length-only covariates (frozen fallback). FM tolerates
+    the longer window by using the context slice."""
+    from afm.models import FlowMatching
+    B, ctx, H, dim = 2, 5, 8, 2
+    afm = AutoregressiveFlowMatching(
+        dim_x=dim, dim_c=1, dim_h=16, dim_t=8, dim_hidden=16, hidden_blocks=1,
+        n_rnn_layers=1, rnn_hidden=16, rngs=nnx.Rngs(0))
+    hist = jnp.asarray(np.random.RandomState(0).randn(B, ctx, dim).astype("float32"))
+
+    full_cov = jnp.broadcast_to(
+        jnp.linspace(0, 1, ctx + H)[None, :, None], (B, ctx + H, 1))   # slides
+    ctx_cov = jnp.broadcast_to(
+        jnp.linspace(0, 1, ctx)[None, :, None], (B, ctx, 1))           # frozen fallback
+
+    p_slide = afm.sample(jr.PRNGKey(0), hist, full_cov, nfe=3, n_steps_pred=H, n_samples=3)
+    p_frozen = afm.sample(jr.PRNGKey(0), hist, ctx_cov, nfe=3, n_steps_pred=H, n_samples=3)
+    assert p_slide.shape == (3, B, H, dim) and p_frozen.shape == (3, B, H, dim)
+    assert bool(jnp.all(jnp.isfinite(p_slide))) and bool(jnp.all(jnp.isfinite(p_frozen)))
+
+    fm = FlowMatching(dim_x=dim, dim_c=1, dim_h=16, dim_t=8, dim_hidden=16,
+                      hidden_blocks=1, n_rnn_layers=1, rngs=nnx.Rngs(1))
+    pf = fm.sample(jr.PRNGKey(0), hist, full_cov, nfe=3, n_steps_pred=H, n_samples=3)
+    assert pf.shape[0] == 3 and bool(jnp.all(jnp.isfinite(pf)))  # FM tolerates the longer window
+
+
 def test_diagnostics_coverage_horizonwise_correlation():
     from afm.datasets.diagnostics import coverage, horizonwise, correlation_distance
     rng = np.random.RandomState(0)

@@ -125,6 +125,11 @@ class FlowMatching(BaseFlow):
             n_steps_pred: int
         ) -> jnp.ndarray:
             """Generate a single prediction sample."""
+            # FM conditions only on the context window; if the caller passes a longer
+            # covariate sequence (context + horizon, as AFM's sliding sampler needs),
+            # use just the context-length slice so process_history shapes stay aligned.
+            covariates = covariates[:history.shape[0]]
+
             def vf(t, x, args):
                 history, covariates = args
                 return self(x, history, covariates, t)
