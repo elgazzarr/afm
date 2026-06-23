@@ -75,6 +75,8 @@ def run_seed(ds, cfg, H, ch, epochs, fm_mult, seed):
         fm_train, fm_test, num_epochs=epochs * fm_mult, seed=seed + 100, use_wandb=False)
 
     recs = {}
+    models = {"AFM": afm, "FM": fm}
+    preds_store = {}
     for name, model, key in (("AFM", afm, 1000 + seed), ("FM", fm, 2000 + seed)):
         m, preds, gt = evaluate_on_trajectories(
             model, ds, cfg, jr.PRNGKey(key), n_steps_pred=H,
@@ -85,8 +87,10 @@ def run_seed(ds, cfg, H, ch, epochs, fm_mult, seed):
             "cov50": s["coverage"][0.5], "cov90": s["coverage"][0.9],
             "corr_dist": s["corr_distance"],
             "crps_h": s["crps_h"].tolist(), "cov90_h": s["coverage_per_h"][0.9].tolist(),
+            "cov50_h": s["coverage_per_h"][0.5].tolist(),
         }
-    return recs
+        preds_store[name] = (np.asarray(preds), np.asarray(gt))
+    return recs, models, preds_store
 
 
 def _ms(vals):
@@ -108,11 +112,38 @@ def main():
     ap.add_argument("--out-dir", default="results/realworld")
     args = ap.parse_args()
 
+    import pickle
     ds, cfg, H, ch, tag = load_problem(args)
+    safe = tag.replace("/", "_")
+    os.makedirs(args.out_dir, exist_ok=True)
+    models_dir = os.path.join(args.out_dir, "models"); os.makedirs(models_dir, exist_ok=True)
+
     per_seed = []
+    seed0_preds = None
     for s in range(args.seeds):
         print(f"[multiseed {tag}] seed {s+1}/{args.seeds} ...", flush=True)
-        per_seed.append(run_seed(ds, cfg, H, ch, args.epochs, args.fm_epoch_mult, s))
+        recs, models, preds_store = run_seed(ds, cfg, H, ch, args.epochs, args.fm_epoch_mult, s)
+        per_seed.append(recs)
+        # Save trained model states (nnx state pytree pickles cleanly) for reproducibility.
+        for name, model in models.items():
+            with open(os.path.join(models_dir, f"{safe}_{name}_seed{s}.pkl"), "wb") as fh:
+                pickle.dump(nnx.state(model), fh)
+        if s == 0:
+            seed0_preds = preds_store
+
+    # Figure-data bundle (seed-0 predictions + de-norm stats) so appendix figures are
+    # reproducible without retraining.
+    sc = ds.meta["scaler"]
+    sensor_cols = ds.meta.get("sensor_cols", [])
+    np.savez(
+        os.path.join(args.out_dir, f"{safe}_figdata.npz"),
+        afm_preds=seed0_preds["AFM"][0], afm_gt=seed0_preds["AFM"][1],
+        fm_preds=seed0_preds["FM"][0], fm_gt=seed0_preds["FM"][1],
+        history=np.asarray(ds.test_traj)[:, :int(args.ctx)],
+        scaler_mean=np.asarray(sc.mean), scaler_std=np.asarray(sc.std),
+        channel=int(ch), ctx=int(args.ctx), H=int(H),
+        tag=np.array(tag), sensor_cols=np.array(sensor_cols, dtype=object),
+    )
 
     scalars = ("crps", "nrmse", "rmse_orig", "mae_orig", "cov50", "cov90", "corr_dist")
     agg = {}
@@ -126,9 +157,6 @@ def main():
         af = "n/a" if am is None else f"{am:.4f}+/-{asd:.4f}"
         ff = "n/a" if fm_ is None else f"{fm_:.4f}+/-{fsd:.4f}"
         print(f"{k:<12}{af:>22}{ff:>22}")
-
-    os.makedirs(args.out_dir, exist_ok=True)
-    safe = tag.replace("/", "_")
 
     import matplotlib
     matplotlib.use("Agg")
