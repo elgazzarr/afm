@@ -42,3 +42,7 @@ rebuttal/
 .ipynb_checkpoints/
 
 data/
+
+# Paper revisions and rebuttal letters (kept local, not part of the code release)
+/rebuttal\ /
+/AFM_R2_revision/
