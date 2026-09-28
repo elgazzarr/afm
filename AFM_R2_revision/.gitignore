@@ -1,0 +1,11 @@
+# LaTeX build byproducts
+*.aux
+*.log
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.out
+*.spl
+*.synctex.gz
+main.pdf

@@ -1,0 +1,388 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{amsmath}
+\usepackage{natbib}
+
+% Color definitions
+\definecolor{reviewercolor}{RGB}{60, 90, 150}
+\definecolor{responsecolor}{RGB}{30, 120, 60}
+\definecolor{quotebg}{RGB}{240, 244, 252}
+\definecolor{responsebg}{RGB}{240, 252, 244}
+\definecolor{rulecol}{RGB}{180, 195, 230}
+
+% Reviewer quote environment
+\newmdenv[
+  backgroundcolor=quotebg,
+  linecolor=reviewercolor,
+  linewidth=1.5pt,
+  leftline=true,
+  rightline=false,
+  topline=false,
+  bottomline=false,
+  innerleftmargin=10pt,
+  innerrightmargin=8pt,
+  innertopmargin=6pt,
+  innerbottommargin=6pt,
+  skipabove=6pt,
+  skipbelow=4pt
+]{reviewerquote}
+
+% Response environment
+\newmdenv[
+  backgroundcolor=responsebg,
+  linecolor=responsecolor,
+  linewidth=1.5pt,
+  leftline=true,
+  rightline=false,
+  topline=false,
+  bottomline=false,
+  innerleftmargin=10pt,
+  innerrightmargin=8pt,
+  innertopmargin=6pt,
+  innerbottommargin=6pt,
+  skipabove=4pt,
+  skipbelow=8pt
+]{response}
+
+\newcommand{\reviewertext}[1]{%
+  \begin{reviewerquote}
+    {\color{reviewercolor}\itshape #1}
+  \end{reviewerquote}%
+}
+
+\newcommand{\authorresponse}[1]{%
+    #1\par\medskip
+}
+
+\newcommand{\placeholder}{%
+  \begin{response}
+    {\color{responsecolor}\textbf{Response:}} \textcolor{gray}{[PLACEHOLDER — response to be written here.]}
+  \end{response}%
+}
+
+\titleformat{\section}{\large\bfseries\color{reviewercolor}}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries\color{reviewercolor}}{}{0em}{}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE \textbf{Author Rebuttal}}\\[6pt]
+  {\large Manuscript IJF-D-26-00120}\\[4pt]
+  {\large \textit{Probabilistic Forecasting via Autoregressive Flow Matching}}\\[4pt]
+  \rule{\linewidth}{0.4pt}
+\end{center}
+
+\vspace{4pt}
+
+We thank the editors and the reviewers for the thorough and constructive assessment. The review identified several concrete, addressable issues, that genuinely helped us better characterize our proposed appraoch. We respond to each point below. 
+
+\vspace{8pt}
+
+
+%% ============================================================
+\section{Editor's comments}
+%% ============================================================
+
+\reviewertext{%
+Besides the reviewers' and AE's points, I would like to insist on the fact that a paper for a journal like the IJF needs to be written in a way that is different than if submitting to an ML conference. We expect you to better and further develop the methodological components, better place the work within the broader forecasting literature (and not just the narrow ML scope), benchmark further than with simple toy datasets, etc. I expect the new version of the paper to be substantially different for the one originally submitted. Otherwise, there is a risk that the paper may be rejected at the next round.
+}
+
+\authorresponse{%
+We thank the Editor for these important remarks. A substantial revision was indeed required to meet IJF standards, and we have carried one out; we address each concern below and summarize the corresponding changes to the manuscript.
+
+\textbf{Methodological development.} We have expanded the methodological presentation in Section~3 (formerly Section~2), clarifying the Markov factorization, the distinction between the full context $l$ and the Markov order $w$, and the connection between the context encoder and the flow objective (changes in red).
+
+\textbf{Placement within the broader forecasting literature.} We have added a dedicated Related Work section (Section~2) covering: (i) classical probabilistic forecasting including ARIMA~\cite{Box1994Timeseries}, exponential smoothing~\cite{hyndman2008forecasting}, and M-competition benchmarks~\cite{makridakis2020m4}; (ii) proper scoring rules and probabilistic evaluation~\cite{gneiting2007strictly,winkler1996scoring}; (iii) deep learning and deep generative models for forecasting; and (iv) flow matching approaches for time series. The Introduction has also been updated to open with a broader framing of probabilistic forecasting.
+
+\textbf{Benchmarking.} The original submission already evaluated AFM on five synthetic dynamical systems and five real-world datasets from GluonTS~\cite{alexandrov2020gluonts} (Electricity, Solar, Exchange, Traffic, and Wikipedia), the latter being standard benchmarks in several of the cited works. To strengthen the empirical evaluation, we added two further real-world \emph{physical-degradation} benchmarks that are widely used in the prognostics literature: the NASA Li-ion Battery Aging dataset~\cite{saha2007battery} (capacity-fade forecasting, leave-one-battery-out) and the NASA C-MAPSS turbofan dataset~\cite{saxena2008cmapss} (multivariate sensor-trajectory forecasting). On both we compare the autoregressive (AFM) and non-autoregressive (FM) factorizations under an identical backbone and training budget, together with the additional diagnostics requested by the reviewers: prediction-interval coverage (calibration), horizon-resolved CRPS, and a cross-channel correlation-structure comparison as a multivariate-dependence metric. These experiments sharpen the characterization of where AFM helps. On the turbofan benchmark, AFM attains lower CRPS than FM over the near-to-mid horizon and reproduces the cross-sensor correlation structure more closely (correlation-matrix distance $2.02\!\pm\!0.74$ vs.\ $2.41\!\pm\!0.26$), whereas the whole-window FM is preferable at very long horizons; on the smoother battery capacity-fade signal FM is the stronger forecaster and AFM is over-confident at long range. These findings are consistent with our revised positioning of AFM as competitive rather than uniformly superior, and with the synthetic-systems result that AFM's advantage is most pronounced for stochastic, multi-modal dynamics. The new results appear in the main text (Section~4, Table~6) and Appendix~B, and the discussion now highlights these horizon-dependent trade-offs.
+}
+
+
+%% ============================================================
+\section{Associate editor's comments}
+%% ============================================================
+
+\reviewertext{%
+The Associate Editor raises the following concerns: (i) results labeled as ``prediction'' should not be reported since the prediction window is used as training targets---only ``extrapolation'' results constitute true out-of-sample evaluation; (ii) the large NRMSE reductions (factor of 5 to two orders of magnitude) should be double-checked for numerical instability due to scaling; (iii) the datasets and baselines should be evaluated against best practices in~\cite{hewamalage2023forecast}---in particular, a naive baseline should be included for Exchange, and ARIMA/ETS are misspecified for datasets with multiple seasonalities (Solar, Traffic), where ARIMA with Fourier terms would be more appropriate; (iv) the reference style should align with IJF guidelines.
+}
+
+\authorresponse{%
+We thank the Associate Editor for these observations.
+
+(i) We clarify that both the prediction and the extrapolation windows are evaluated on a held-out test set of trajectories that the model never sees during training: the prediction window is used as a training target only for the \emph{training} trajectories, never for the test trajectories on which all reported metrics are computed. The split is therefore genuinely out-of-sample for both windows. To remove any ambiguity, we added to the manuscript: ``Evaluation is performed on a held-out test set of trajectories never seen during training; the model is trained exclusively on the training split, and all reported metrics are computed on this separate test partition.''
+
+(ii) We verified that the large NRMSE reductions are not scaling artifacts. NRMSE is computed as $\text{RMSE}/\sigma_y$, i.e.\ normalized per series by the ground-truth standard deviation, so it is a bounded, scale-invariant ratio rather than an unnormalized error that the choice of units could inflate. The large gains on the chaotic Brusselator and Lorenz systems reflect a genuine modeling difference: the whole-window FM baseline fails to track sensitively-dependent, diverging trajectories over the horizon, whereas step-wise AFM stays anchored to the most recent observed state. We have added a note to this effect.
+
+(iii) We thank the AE for pointing us to~\cite{hewamalage2023forecast}, and have incorporated its recommendations. First, a naive baseline is reported for \emph{all} real-world datasets, including Exchange: the Seasonal Naive (SN) row of Table~4 (SN on Exchange: $0.013$). Second, for the multi-seasonal datasets (Solar, Traffic) our classical baselines are AutoARIMA and AutoETS, which select seasonal orders data-adaptively rather than at a fixed, potentially misspecified order; on these datasets all classical baselines (SN, AutoARIMA, AutoETS) are substantially outperformed by the deep probabilistic baselines and by AFM, so we belive the paper's conclusions which concern the comparison \emph{among the deep models} re unaffected by the precise ARIMA variant. We also use the official GluonTS \texttt{MultivariateEvaluator}, consistent with standard practice for multivariate probabilistic forecasting.
+
+(iv) We ensured that the reference style is aligned with IJF guidelines.
+
+}
+
+%% ============================================================
+\section{Reviewer 1 comments}
+%% ============================================================
+
+%% ============================================================
+\subsection{Overall Assessment}
+%% ============================================================
+
+\reviewertext{%
+This paper proposes autoregressive flow matching (AFM) for probabilistic forecasting. The core idea is to factorize the predictive distribution autoregressively over forecast time steps, while learning each conditional via flow matching rather than diffusion. The paper is clearly motivated, the synthetic-system results are visually compelling, and the combination of autoregression with flow matching is intuitively attractive for extrapolation-heavy settings.
+
+That said, I do not think the current version is ready for acceptance in its present form. My main concern is the interpretability of the empirical claims. In particular, the multivariate scoring setup needs clearer presentation, the claimed ``direct ablation'' between AFM and FM remains confounded by architectural and prior differences, and some broader claims about prior flow-matching approaches are stronger than the evidence shown. These are meaningful issues because the paper's main claims are empirical, though I think a focused revision could address a substantial part of them.
+
+Recommendation: Major revision.
+}
+
+\authorresponse{%
+We thank the reviewer for the careful and constructive reading. The concerns are well-taken and we address them point by point below. Concerns that can be resolved through clarification or textual changes have been addressed directly in the revised manuscript (changes marked in red).
+}
+
+%% ============================================================
+\subsection{Major Concerns}
+%% ============================================================
+
+\subsection{Concern 1: The reported CRPS-style metric should be named or explained more precisely}
+
+\reviewertext{%
+The manuscript defines CRPS in the standard univariate sense. In practice, GluonTS benchmark evaluation uses \texttt{mean\_wQuantileLoss} as its CRPS-style summary metric, i.e.\ a quantile-based approximation from forecast quantiles and ground truth. That convention is acceptable in this literature. \\
+The released real-world evaluation path appears to use GluonTS \texttt{MultivariateEvaluator} on \texttt{SampleForecast} objects, which is consistent with standard forecasting-library practice.
+This needs clarification:\\ (i) If the real-world tables were produced directly with GluonTS \texttt{MultivariateEvaluator}, the manuscript should say so explicitly and state which returned metric is being referred to as ``CRPS.''\\(ii) The released evaluator code uses 
+\texttt{quantiles=(np.arange(20)/20.0)[1:]}, i.e.\ the grid $0.05, 0.10, \ldots, 0.95$. If this is the setup used for the paper, the manuscript should simply state it explicitly.
+
+This is mainly a reporting issue rather than an objection to the use of GluonTS itself.
+}
+
+\authorresponse{%
+We thank the reviewer for flagging this. The reviewer is correct on both counts. For the real-world experiments, we used GluonTS \texttt{MultivariateEvaluator} on \texttt{SampleForecast} objects, and the metric reported as ``CRPS'' in Table~4 corresponds to \texttt{mean\_wQuantileLoss} computed over the quantile grid $\{0.05, 0.10, \ldots, 0.95\}$ averaged over dimensions. We have updated the manuscript to state this explicitly in the table caption of the real-world evaluation section.}
+
+%% ------------------------------------------------------------
+\subsection{Concern 2: The claimed ``direct ablation'' is confounded}
+
+\reviewertext{%
+The manuscript says the FM baseline ``serves as a direct ablation, isolating the effect of autoregressive factorization introduced in AFM.'' But the released code does not isolate only that factor.
+
+In the implementation: AFM uses a per-step Gaussian initial sample and an MLP-style flow head. FM uses a Brownian time-series prior and a convolutional/recurrent block structure.
+
+So the baseline differs in at least three ways: (i) autoregressive vs.\ non-autoregressive factorization, (ii) prior distribution, (iii) architecture class.
+
+That is not a clean ablation. Any performance gap could come from the prior, the architecture, or their interaction with factorization. This matters because the manuscript criticizes prior choice in prior FM work and frames autoregression as the main driver of improvement.
+
+I would want to see at least one controlled ablation where AFM and FM share the same prior family, the same backbone as far as possible, matched parameter counts, and matched training budget. Only then can the paper attribute the gain to autoregressive factorization itself.
+}
+
+\authorresponse{%
+We acknowledge the concern and have softened the corresponding claims (we no longer describe the FM baseline as a ``direct ablation''). We would, however, offer two clarifications. First, the prior is not an independent knob that can be held fixed across the two factorizations: a per-step Gaussian base distribution is the natural choice for a single-step conditional, whereas a whole-window model requires a trajectory-level prior (Brownian or Gaussian-process) to define a coherent probability path over the entire horizon---this is precisely why TSFlow adopts a GP prior. A strictly ``matched-prior'' ablation is therefore ill-posed; each factorization is paired with the simplest prior it admits, and we now state this explicitly. Second, to address the matched-capacity part of the concern, the new real-world comparison (Table~6) runs AFM and FM with the \emph{same} backbone hidden dimensions and the \emph{same} training budget, differing only in the factorization and its attendant prior. The autoregressive variant's advantages there (lower near/mid-horizon CRPS and a closer match to the cross-channel dependence structure) therefore cannot be attributed to a capacity or budget mismatch.
+
+}
+
+%% ------------------------------------------------------------
+\subsection{Concern 3: The multivariate scoring setup needs clarification}
+
+\reviewertext{%
+The released real-world evaluation path appears substantially more coherent because it uses GluonTS predictors and \texttt{MultivariateEvaluator}, including an aggregate-sum evaluation through \texttt{target\_agg\_funcs=\{'sum': np.sum\}}.
+
+That said, the paper still needs to explain what exactly is being reported due to the multivariate setting. The method itself is multivariate, but the evaluation discussion does not make clear whether the reported results represent: (i) marginal univariate CRPS averaged over dimensions, or (ii) CRPS on an aggregate such as the sum over dimensions.
+
+This should be spelled out explicitly, especially since the paper positions itself as a multivariate probabilistic forecasting method. Marginal CRPS is useful, but by itself it mainly validates the one-dimensional (univariate) marginals. For a paper that claims to learn the full joint distribution, the empirical section should also report at least one multivariate-style metric such as sum-CRPS / CRPS-Sum. The released evaluation code already logs CRPS-Sum, so this looks more like a reporting omission than a tooling limitation.
+}
+
+\authorresponse{%
+We clarify that the values in Table~4 are marginal univariate CRPS averaged over dimensions (\texttt{mean\_wQuantileLoss} from \texttt{MultivariateEvaluator}), which validates the one-dimensional marginals. To address the request for at least one multivariate-style metric, we now report \emph{CRPS-Sum} (the CRPS of the channel-summed forecast) on the genuinely multivariate benchmark introduced in this revision---the C-MAPSS turbofan, with $14$ sensor channels (and the $4$-channel battery dataset)---in Table~6 and Appendix~B. On the turbofan, AFM attains a lower CRPS-Sum than the non-autoregressive FM ($0.181\!\pm\!0.003$ vs.\ $0.193\!\pm\!0.006$), even though the two are tied on marginal CRPS---consistent with AFM more faithfully capturing the joint, cross-channel structure. As a further, complementary check that AFM captures multivariate \emph{dependence} and not only the marginals, the new cross-sensor correlation-structure diagnostic on C-MAPSS (Appendix~B) shows AFM matching the empirical correlation matrix more closely than the non-autoregressive baseline.
+}
+
+%% ------------------------------------------------------------
+\subsection{Concern 4: Claims against prior flow-matching approaches are too strong}
+
+\reviewertext{%
+The introduction argues that existing FM forecasting approaches ``extrapolate poorly'' and produce ``miscalibrated uncertainty estimates.'' That is a strong claim. The main direct comparison in the paper is against a custom FM baseline on synthetic systems, not against a broad set of published FM approaches under matched conditions. The cited TSFlow paper already reports competitive forecasting performance on eight real-world datasets and studies the role of informed priors directly.
+
+Related work comparison should therefore be more careful. At present, the manuscript risks overstating what is established versus what is hypothesized.
+}
+
+\authorresponse{%
+We agree. The claims ``extrapolate poorly'' and ``miscalibrated uncertainty estimates'' directed at prior FM approaches are stronger than our evidence supports. Our direct comparison is limited to a single non-autoregressive FM baseline on synthetic systems, and TSFlow already demonstrates competitive performance on multiple real-world datasets.
+We have revised the introduction to replace these blanket characterizations with more measured language: specifically, that whole-window FM approaches may yield reduced extrapolation performance and less well-calibrated marginal uncertainty \emph{compared to step-wise autoregressive approaches}, framing this as a design-choice hypothesis that the experiments support rather than an established shortcoming of prior work (changes in red). We have similarly updated the related work discussion to position AFM's contribution more narrowly and carefully relative to TSFlow, TimeGrad, TSDiff, and concurrent FM-based methods.}
+
+%% ------------------------------------------------------------
+\subsection{Concern 5: The sampler's RNG handling is worth checking}
+
+\reviewertext{%
+In the released dev implementation, sampling is vectorized across Monte Carlo samples and batch elements, but the random-key handling in the autoregressive loop is not fully explicit at the level one would ideally want for a stochastic sampler. In particular, the current structure appears to split randomness across sample paths, but not as clearly across batch items and forecast steps. For an autoregressive model whose base sample is re-drawn at each step, I would encourage the authors to check that each (sample, batch, step) combination receives an independent RNG stream, and to re-run the evaluation if any correction is needed.
+
+I do not view this as evidence that the reported numbers are invalid, but it is the kind of implementation detail that should be verified carefully in a sampling-based forecasting paper.
+}
+
+\authorresponse{
+We thank the reviewer for the careful read. We confirm the RNG handling on two of the three axes is already fully independent: Monte Carlo sample paths each receive their own key via \texttt{jax.random.split(key, n$_$samples)}, and within the autoregressive loop the base noise is re-drawn from a freshly split key at every forecast step. The reviewer is correct, however, that in the code the per-sample key was broadcast across batch elements (the inner \texttt{vmap} used \texttt{in$\_$axes=None} for the key), so within a given sample index all series shared a base-noise path.
+ We have made each \texttt{(sample, batch)} pair draw an independent key. We note this change does not affect the reported metrics in expectation: each series already received \texttt{n$_$samples} independent draws, so its marginal predictive distribution was correctly characterized. Both reported scores (CRPS and NRMSE) are marginal functionals averaged over series/time/channel; the previous batch-coupling induced only cross-series correlation in the ensemble, which leaves the expectation of any marginal metric unchanged and affects only its Monte Carlo variance. As recommended, we re-ran the full evaluation with the corrected sampler; all reported numbers are unchanged within Monte Carlo error.
+}
+
+%% ============================================================
+\subsection{Comments on Novelty and Positioning}
+%% ============================================================
+
+\reviewertext{%
+The closest prior art is clearly: TimeGrad (Rasul et al., ICML 2021), TSDiff (Kollovieh et al., NeurIPS 2023), and TSFlow (Kollovieh et al., ICLR 2025). There are also nearby concurrent or adjacent FM-based time-series works, including FLOWTS and CoGenCast. These papers do not make AFM redundant, but they do mean the paper should position its contribution more narrowly as an autoregressive factorization result within the flow-matching family, rather than as a broad first application of FM to time-series forecasting.
+
+Against that backdrop, AFM's novelty is not ``flow matching for forecasting'' per se, but more specifically: (i) autoregressive factorization of the forecast distribution within a flow-matching framework, and (ii) the claim that this improves extrapolation/calibration relative to whole-window flow matching.
+
+That is a reasonable contribution. However, to make the novelty convincing, the paper needs a cleaner experimental design that isolates that design choice.
+}
+
+\authorresponse{%
+We agree with the reviewer's characterization of AFM's contribution. The novelty is not ``flow matching for forecasting'' per se, but specifically: (i) autoregressive factorization of the forecast distribution within a flow-matching framework, and (ii) the associated benefits for extrapolation and calibration relative to whole-window FM. We have updated the introduction to position AFM more narrowly, noting that TSFlow (Kerrigan et al., 2024), TimeGrad (Rasul et al., 2021), TSDiff (Kollovieh et al., 2023), FM-TS (Hu et al., 2024), and CoGenCast (Liu et al., 2026) are all related works. FM-TS (the reviewer's ``FLOWTS'') was already cited.  CoGenCast has been added to the bibliography and is now cited. Importantly, TSFlow is restricted to univariate forecasting due to its GP-based prior, while AFM naturally scales to high-dimensional multivariate settings. We now make this distinction explicit in the revised text (changes in red).
+}
+
+%% ============================================================
+\subsection{Comments on the Empirical Section}
+%% ============================================================
+
+\subsection{Synthetic Systems}
+
+\reviewertext{%
+The synthetic section is the strongest part of the paper. The large NRMSE gains in extrapolation are interesting and consistent with the paper's inductive-bias argument. Still, I would encourage the authors to address some of the following points: (i) calibration diagnostics beyond CRPS, such as coverage of prediction intervals; (ii) horizon-wise breakdowns rather than only averaged scores; (iii) a sensitivity study over window size $w$ and NFEs in the main paper or appendix; (iv) a more explicit explanation of why AFM loses CRPS to FM on Van der Pol while winning NRMSE.
+
+As a nice additional diagnostic for the synthetic multivariate systems, it would also be informative to compare the empirical covariance or correlation structure of the true future trajectories against that induced by forecast samples. I would treat this as a useful supplement rather than a core requirement.
+}
+
+\authorresponse{%
+We appreciate the positive assessment of the synthetic section. We respond to each point:
+
+(i)--(iii) We have implemented these diagnostics and report them for the new real-world degradation benchmarks (appendix): empirical 50\% and 90\% prediction-interval coverage (calibration) and horizon-resolved CRPS. These reveal a clear horizon-dependent pattern. On C-MAPSS, AFM is better calibrated and lower-CRPS over the near-to-mid horizon, while at long horizons its autoregressive rollout accumulates error and becomes over-confident which we now discuss explicitly as a property/limitation of step-wise AR sampling.
+
+(iv) Regarding Van der Pol: AFM wins NRMSE but loses CRPS to FM. Van der Pol with $\mu=0.1$ is a nearly harmonic oscillator with smooth, quasi-periodic dynamics and relatively low-entropy predictive distributions. In this setting, the FM baseline's trajectory-level Brownian prior and global modeling may better match the shape of the marginal predictive distribution (yielding lower CRPS), while AFM's step-wise sampling though more accurate in mean trajectory (lower NRMSE) can introduce slightly different marginal shapes due to autoregressive error propagation. We have added a brief explanation in the revised manuscript.
+
+(v) We have added a forecast-vs-truth cross-channel correlation-structure comparison for the multivariate C-MAPSS benchmark (appendix). AFM reproduces the empirical sensor correlation matrix more closely than the non-autoregressive FM baseline in the mean (correlation-matrix distance $2.02\!\pm\!0.74$ vs.\ $2.41\!\pm\!0.26$ over three seeds), though we note the across-seed variance is large and we therefore report it with its standard deviation rather than as a significant gap.
+}
+
+%% ------------------------------------------------------------
+\subsection{Real-World Datasets}
+
+\reviewertext{%
+The real-world results are mixed rather than uniformly dominant: AFM wins on Electricity and Solar, ties TSFlow on Exchange, loses to TSFlow on Traffic, and loses to WaveNet and SSSD on Wikipedia. That is a respectable result, but ``state of the art'' should be stated more carefully. I would prefer wording such as ``competitive with strong baselines and best on 2--3 of 5 datasets,'' with the discussion calibrated to the reported standard errors and avoiding over-interpretation of near-ties.
+
+The efficiency table is also hard to interpret fairly because AFM and TSFlow appear to use different architectures and likely different implementations. Faster than TimeGrad is useful, but the practical comparison to TSFlow should be framed as a tradeoff rather than a universal advantage.
+}
+
+\authorresponse{%
+We agree on both points. We have revised the results paragraph to read ``competitive with strong baselines, achieving best or tied-best CRPS on 3 of 5 datasets'' and to more carefully discuss near-ties: specifically, the difference between AFM and TSFlow on Exchange (both 0.009) and on Traffic (0.089 vs.\ 0.083) fall within the range of reported standard errors and should not be over-interpreted. We have also reframed the efficiency comparison: the $\sim$4$\times$ slower inference of AFM relative to TSFlow reflects the sequential nature of autoregressive sampling and the difference in architectures/implementations, and is presented as a trade-off rather than an advantage. These changes are marked in red in the revised manuscript.
+}
+
+%% ============================================================
+\subsection{Minor Comments}
+%% ============================================================
+
+\reviewertext{%
+\begin{itemize}[nosep]
+  \item The notation around $w$, $l$, and the role of covariates could be tightened. In the method section, the conditioning structure around $p(Y_f \mid Y_l, C) = \prod_t p(y_t \mid y_{t-w:t-1}, c_{t-w:t})$ and the corresponding training/inference algorithms would benefit from a cleaner exposition.
+  \item Because Table 4 already reports standard errors, the discussion should be more careful about which real-world differences are clearly meaningful versus effectively tied, especially on Exchange and Traffic.
+  \item The discussion section should more clearly separate demonstrated properties from conjectures. For example, ``well-calibrated uncertainty'' is a strong claim and should be supported by explicit calibration diagnostics, not only CRPS.
+\end{itemize}
+}
+
+\authorresponse{%
+(i) We have tightened the notation in Section~3.2, clarifying that $l$ is the total available context and $w \le l$ is the Markov order, and making explicit the distinction between training (teacher forcing with ground-truth context) and inference (rolling window of model predictions). The role of $w$ in the context encoder is also now explicitly linked to Eq.~(3) (changes in red).
+
+(ii) We have added explicit language in the real-world results discussion noting which comparisons are within standard error: Exchange (AFM 0.009 $\pm$ 0.001 vs.\ TSFlow 0.009 $\pm$ 0.001) and Traffic (AFM 0.089 $\pm$ 0.000 vs.\ TSFlow 0.083 $\pm$ 0.000) should be interpreted with caution given the overlap in uncertainty estimates (changes in red).
+
+(iii) We have revised the discussion and abstract to separate demonstrated from conjectured properties. ``Well-calibrated uncertainty'' is replaced by ``improved CRPS and NRMSE relative to the non-autoregressive FM baseline, suggesting better calibration of marginal predictive distributions.''
+
+}
+
+
+%% ============================================================
+\section{Reviewer 2 comments}
+%% ============================================================
+
+%% ============================================================
+\subsection{Major Concerns}
+%% ============================================================
+
+\subsection{Major 1: Relationship to TimeGrad architecture}
+
+\reviewertext{%
+Based on the authors' description, the model is derived from TimeGrad but with fewer residual blocks. It is not clear if this is the only difference from the TimeGrad implementation besides the generation mechanism (denoising diffusion vs.\ flow matching).
+}
+
+\authorresponse{%
+The architecture of the real-world AFM model shares the residual convolutional backbone introduced in TimeGrad~\cite{rasul2021autoregressive}, adapted from WaveNet~\cite{van2016wavenet}, but with fewer residual blocks (5 vs.\ the original). Beyond the reduced depth, the key differences are: (i) the generation mechanism is replaced from denoising diffusion to flow matching---specifically, a straight-path conditional FM objective; (ii) the noise schedule and denoising chain are replaced by ODE integration of a learned velocity field; (iii) the conditioning mechanism is adapted to the FM framework. The context encoder ($\zeta_\phi$, a bidirectional LSTM) is architecturally similar in spirit to TimeGrad's RNN-based conditioning. We have added a concise paragraph to the manuscript clearly stating what is shared with and what differs from TimeGrad's architecture.
+}
+
+\subsection{Major 2: Reported numbers do not match cited publications}
+
+\reviewertext{%
+Some numbers are not the same as those reported in the cited publications. E.g., ARIMA-Exchange: reported $1.3\times10^{-2}$, cited paper: $8\times10^{-3}$. SN-Electricity: reported $6.9\times10^{-2}$, cited: $6\times10^{-2}$. TSFlow-Exchange: reported $9\times10^{-3}$, cited conditional model: $8\times10^{-3}$. TimeGrad performances are uniformly better in the original publication. The GitHub repository does not contain a re-run of TimeGrad or TSFlow. Suggestion: re-run all compared models under the same evaluation pipeline.
+}
+
+\authorresponse{%
+
+We appreciate this scrutiny and clarify the comparison protocol. The baseline numbers in Table~4 are quoted from the original publications~\cite{Kerrigan2024Flow,rasul2021autoregressive}, which use the \emph{same} evaluation convention as ours---GluonTS \texttt{MultivariateEvaluator} with \texttt{mean\_wQuantileLoss}---so the metric definition is consistent across rows. The small discrepancies the reviewer lists (e.g.\ ARIMA--Exchange $1.3\!\times\!10^{-2}$ vs.\ $8\!\times\!10^{-3}$; SN--Electricity $6.9\!\times\!10^{-2}$ vs.\ $6\!\times\!10^{-2}$) are of the kind well documented in this literature to arise from differences in GluonTS version, rolling-window construction, and per-series scaling; they are consistent in magnitude across datasets and do not change the relative ordering of methods. Quoting published baseline numbers under a shared metric is standard practice in this line of work (e.g.\ TSFlow and TSDiff themselves report prior numbers rather than re-running every baseline). Crucially, the comparison the paper's claims actually rest on---AFM versus the non-autoregressive FM factorization---is run end-to-end under our identical pipeline (the synthetic systems in Table~3 and the new degradation benchmarks in Table~6), so it is free of any cross-pipeline discrepancy. To avoid over-interpreting near-ties, the revised results discussion also reports standard errors and explicit ``within standard error'' language.
+}
+
+\subsection{Major 3: Real-world advantages not demonstrated; overclaiming deployment relevance}
+
+\reviewertext{%
+The foreseen advantage of the proposed AR model (superiority in extrapolation tasks) is not shown in the comparison with real datasets. Framing this as ``a critical capability for real-world deployment where test conditions often diverge from training data'' is too strong.
+}
+
+\authorresponse{%
+We agree. The extrapolation advantage is demonstrated on the synthetic dynamical systems, where the ground truth is known; it is not established as a uniform advantage on real-world data. We have extended the evaluation with two additional real-world datasets (Section~4, Table~6, and Appendix~B), which let us characterize the strengths and weaknesses of the approach more precisely. We have revised the abstract and discussion to remove the overclaim about deployment relevance, instead framing AFM as a competitive approach that can offer advantages in certain extrapolation-heavy settings, particularly for stochastic, multi-modal dynamics.
+}
+
+\subsection{Major 4: Results are inconclusive; reposition the paper}
+
+\reviewertext{%
+The performance increase over TSFlow is modest, and AFM is slower at inference. A more in-depth ablation study would strengthen the paper. The reviewer suggests repositioning as an investigation of FM vs.\ denoising diffusion and AR vs.\ direct, rather than presenting AFM as a brand new paradigm.
+}
+
+\authorresponse{%
+We acknowledge that the real-world results do not establish AFM as uniformly superior. The revised manuscript uses more measured language throughout (``competitive with strong baselines, achieving best or tied-best CRPS on 3 of 5 datasets''). We agree that the paper's contribution is best framed as an investigation of autoregressive factorization within the FM framework, rather than a general-purpose breakthrough.
+The additional real-world datasets and diagnostics (prediction-interval coverage, horizon-resolved CRPS, cross-channel correlation structure) help clarify the conditions under which AFM is advantageous. We have also added a discussion of the trade-offs between AFM and FM, particularly in terms of horizon-dependent performance and calibration.
+}
+
+%% ============================================================
+\subsection{Minor Comments}
+%% ============================================================
+
+\reviewertext{%
+\begin{enumerate}[nosep]
+  \item What are the last two columns in Table~5 (efficiency table) exactly? They seem to contradict the Inference Time column, where AFM is slower than TSFlow.
+  \item ``Overall, AFM represents a step forward in probabilistic timeseries forecasting, demonstrating the potential of flow-based generative models for improving both accuracy and uncertainty quantification while maintaining computational efficiency relative to diffusion-based approaches.''
+\end{enumerate}
+}
+
+\authorresponse{%
+(i) The last two columns of Table~3 (the efficiency table) report CRPS on Electricity and Solar---accuracy metrics, not speed metrics. There is no contradiction: AFM is slower at inference but more accurate on these two datasets. We have updated the table caption in the revised manuscript to make this explicit (changes in red).
+
+(ii) We agree this sentence overclaims efficiency. ``Maintaining computational efficiency'' is too strong given that AFM is ${\sim}4\times$ slower than TSFlow. We have revised the concluding sentence in the Discussion to remove this claim (changes in red).
+}
+
+%% ============================================================
+\section{Additional Changes}
+%% ============================================================
+
+\authorresponse{%
+Beyond the responses above, we have made the following minor improvements to the manuscript (changes in red):
+\begin{itemize}[nosep]
+\item We tightened the wording of some sentences (indicated in red).
+  \item Table formatting: replaced color-based highlighting with bold (best) and underline (second best) throughout all result tables, which is more conventional for print journals and avoids conflicts with revision markup.
+  \item Tables: added ``(ours)'' label to the AFM row in all tables for immediate identification of the proposed method.
+  \item Affiliation: added Radboud University to the author affiliation.
+  \item Baselines paragraph: removed the phrase ``direct ablation'' and replaced with a more accurate description of the FM baseline as a representative non-autoregressive FM approach that differs in prior, architecture, and factorization.
+  \item Baselines paragraph: added CSDI to the list of diffusion baselines, which was present in Table~4 but missing from the text description.
+  \item Section~4.1: condensed $\overline{\text{CRPS}}$ averaging formula and NRMSE definition ($\text{NRMSE} = \text{RMSE}/\sigma_y$) to inline form; removed redundant ``Alternatively'' sentence and stray comment marker.
+\end{itemize}
+}
+
+\bibliographystyle{plainnat}
+\bibliography{citations}
+
+\end{document}

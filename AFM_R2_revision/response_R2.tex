@@ -1,0 +1,183 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{amsmath}
+\usepackage{natbib}
+
+% Color definitions
+\definecolor{reviewercolor}{RGB}{60, 90, 150}
+\definecolor{responsecolor}{RGB}{30, 120, 60}
+\definecolor{quotebg}{RGB}{240, 244, 252}
+\definecolor{responsebg}{RGB}{240, 252, 244}
+\definecolor{rulecol}{RGB}{180, 195, 230}
+
+% Reviewer quote environment
+\newmdenv[
+  backgroundcolor=quotebg,
+  linecolor=reviewercolor,
+  linewidth=1.5pt,
+  leftline=true,
+  rightline=false,
+  topline=false,
+  bottomline=false,
+  innerleftmargin=10pt,
+  innerrightmargin=8pt,
+  innertopmargin=6pt,
+  innerbottommargin=6pt,
+  skipabove=6pt,
+  skipbelow=4pt
+]{reviewerquote}
+
+% Response environment
+\newmdenv[
+  backgroundcolor=responsebg,
+  linecolor=responsecolor,
+  linewidth=1.5pt,
+  leftline=true,
+  rightline=false,
+  topline=false,
+  bottomline=false,
+  innerleftmargin=10pt,
+  innerrightmargin=8pt,
+  innertopmargin=6pt,
+  innerbottommargin=6pt,
+  skipabove=4pt,
+  skipbelow=8pt
+]{response}
+
+\newcommand{\reviewertext}[1]{%
+  \begin{reviewerquote}
+    {\color{reviewercolor}\itshape #1}
+  \end{reviewerquote}%
+}
+
+\newcommand{\authorresponse}[1]{%
+    #1\par\medskip
+}
+
+\newcommand{\placeholder}{%
+  \begin{response}
+    {\color{responsecolor}\textbf{Response:}} \textcolor{gray}{[PLACEHOLDER — response to be written here.]}
+  \end{response}%
+}
+
+\titleformat{\section}{\large\bfseries\color{reviewercolor}}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries\color{reviewercolor}}{}{0em}{}
+
+
+\begin{document}
+
+\begin{center}
+  {\LARGE \textbf{Response to Reviewers (second revision)}}\\[6pt]
+  {\large Manuscript IJF-D-26-00120R1}\\[4pt]
+  {\large \textit{Probabilistic Forecasting via Autoregressive Flow Matching}}\\[4pt]
+  \rule{\linewidth}{0.4pt}
+\end{center}
+
+We thank the Editor, the Associate Editor and both reviewers for their careful reading of the revised manuscript. We respond to each point below. All changes made in this round are shown in \textcolor{blue}{blue} in the revised manuscript; changes from the previous round are no longer highlighted.
+
+%% ============================================================
+\section{Associate Editor}
+%% ============================================================
+
+\reviewertext{%
+1. Exchange dataset. Exchange rates are not seasonal; therefore, the appropriate benchmark is the naive (see Hewamalage et al., 2023) not the seasonal naive introduced by the authors. I ask the authors to include the naive forecast as a baseline for this dataset and remove the seasonal naive.
+}
+
+\authorresponse{%
+We thank the AE for clarifying this point, and apologise for having misread the request in the previous round. We have removed the seasonal naive forecast for Exchange and added the naive (random-walk) forecast, computed with \texttt{statsforecast} under exactly the same windows, evaluator and quantile grid as AFM. Its CRPS is 0.007 (Table~4), the best of all methods on Exchange: AutoARIMA and AutoETS follow at 0.008, and AFM and TSFlow at 0.009. We state explicitly in Section~4.2 that AFM does not improve on the naive forecast on this dataset, which is consistent with the near-random-walk behaviour of exchange rates \citep{meese1983empirical}.
+We now cite \citet{hewamalage2023forecast} in the Baselines paragraph (Section~4.2) as the motivation for dataset-appropriate benchmarks.
+}
+
+\reviewertext{%
+2. Datasets with multiple seasonalities. For the multi-seasonal datasets (Solar and Traffic), the authors use AutoARIMA and AutoETS as classical baselines. However, these models only deal with a single seasonality, not multiple ones. The same for the seasonal naive model, which accounts for only one seasonal period. If they used an implementation suitable for multiple seasonalities, this should be detailed. I therefore ask, for the datasets with multiple seasonalities, to include baselines designed for multiple seasonal patterns.
+}
+
+\authorresponse{%
+We agree: the AutoARIMA, AutoETS and seasonal naive implementations we used each handle a single seasonal period ($m=24$ on the hourly datasets) and cannot represent daily and weekly cycles simultaneously. We now label them as single-season in Table~4. Following the chapter the AE referred us to \citep{hyndman2025fpppy}, we added two baselines designed for multiple seasonal patterns, using periods $24$ and $168$ for all three hourly datasets (Solar, Traffic, and also Electricity, which has the same daily and weekly structure):
+\begin{itemize}[nosep]
+  \item \textbf{MSTL-ETS}: MSTL decomposition \citep{bandara2025mstl} with AutoETS on the seasonally adjusted series;
+  \item \textbf{DHR-ARIMA}: dynamic harmonic regression, i.e.\ ARIMA errors with Fourier terms for both periods, as the AE suggested in the first round; the numbers of Fourier pairs were selected per dataset by AICc, giving $(K_1, K_2) = (6, 4)$, $(6, 2)$ and $(6, 6)$ for Electricity, Solar and Traffic.
+\end{itemize}
+The implementation, seasonal periods, quantile construction and clipping to each dataset's domain are detailed in Section~4.2. The new results are:
+
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+Method & Electricity & Solar & Traffic \\
+\hline
+MSTL-ETS  & 0.058 & 0.520 & 0.248 \\
+DHR-ARIMA & 0.066 & 0.460 & 0.202 \\
+Best single-season classical & 0.055 (AutoETS) & 0.512 (SN) & 0.221 (SN) \\
+AFM       & 0.042 & 0.284 & 0.089 \\
+\hline
+\end{tabular}
+\end{center}
+The multi-seasonal baselines improve on the single-season ones in most but not all cases. DHR-ARIMA is the best statistical method on Solar and Traffic, whereas on Electricity the single-season AutoETS remains best, narrowly ahead of MSTL-ETS. MSTL-ETS improves on the single-season AutoARIMA and AutoETS on Solar and Traffic, but not on the seasonal naive forecast. All statistical baselines remain well behind the deep probabilistic models, so the conclusions of Section~4.2 are unchanged.
+}
+
+\reviewertext{%
+3. Manuscript formatting. The authors state that they update the reference style to be compliant with IJF, but this is not the case. The bibliography is still numeric rather than author--year. [\dots] In addition, IJF papers are formatted in a single-column (not double-column).
+}
+
+\authorresponse{%
+We apologise for this oversight. The manuscript is now typeset in the single-column Elsevier preprint format, with author--year (Harvard) citations and reference list (\texttt{elsarticle-harv}). In the process we also corrected several bibliographic entries (publication years of TSFlow, Flow Matching, Rectified Flow and FFJORD, and an incorrect arXiv identifier).
+}
+
+%% ============================================================
+\section{Reviewer 1}
+%% ============================================================
+
+\reviewertext{%
+All my issues are resolved with this paper and I am happy to see it accepted.
+}
+
+\authorresponse{%
+We thank Reviewer~1 for their constructive comments throughout the review process.
+}
+
+%% ============================================================
+\section{Reviewer 2}
+%% ============================================================
+
+\reviewertext{%
+1) I agree with the AE comments on Figure 2, it is confusing. [\dots] Is the plotted data in the blue and yellow shaded area unseen during training or just the yellow window was unseen? [\dots]
+}
+
+\authorresponse{%
+Both. Every trajectory plotted in Figure~2, and every trajectory used to compute the scores in Table~2, belongs to the held-out test set, which is never used for training in any way; we verified this in the code, where both the plotting and the evaluation draw exclusively from the test data loader. For these trajectories, the blue and the yellow windows are therefore both unseen. Figure~2 thus shows performance within the training horizon (blue) and beyond it (yellow), i.e.\ the ``within and beyond training horizon'' comparison the reviewer describes, and not in-sample versus out-of-sample performance.
+
+We recognise that our previous wording caused the confusion: Section~4.1 described the blue window as ``available only during training'', which is true only for the \emph{training} trajectories. We have rewritten this paragraph to state explicitly that, for the test trajectories, no part of either window is observed during training. We have also relabelled the windows ``within training horizon (steps 76--150)'' and ``beyond training horizon (steps 151--200)'' in Figure~2, in Table~2 and in the text, and corrected ``confidence interval'' to ``prediction interval'' in the caption.
+}
+
+\reviewertext{%
+2) Table 4: AutoETS-Exchange should be the one in bold.
+}
+
+\authorresponse{%
+Thank you. In correcting this, we re-checked every quoted value in Table~4 against its source and found five transcription errors, which we have corrected: AutoARIMA on Exchange (0.008 in the source, not 0.013), seasonal naive on Electricity (0.069), AutoETS on Electricity (0.055), and SSSD on Solar (0.384) and Traffic (0.097); several standard errors were also corrected. We now also state that the TSFlow results are those reported in the first arXiv version of \citet{Kerrigan2024Flow}. All corrections are marked in blue. With these corrections and the new naive row (AE comment~1), the naive forecast (0.007) is best on Exchange and shown in bold, AutoARIMA and AutoETS (both 0.008) are second best and underlined, and AFM and TSFlow (0.009) follow. None of the corrections changes the best or second-best method on the other four datasets. We also corrected the corresponding text: AFM achieves the best CRPS on two of the five datasets (Electricity and Solar), and on Exchange it does not improve on the naive forecast.
+}
+
+\reviewertext{%
+3) Can you explain the sudden drop in CRPS for FM method in figure B.4?
+}
+
+\authorresponse{%
+Thank you for spotting this. The drop does not reflect better forecasts; it results from the interaction of two factors.
+
+First, the non-autoregressive FM baseline, which is trained on 40-step windows, generates the full 108-step C-MAPSS horizon in a single pass, and its predictive spread grows sharply over the final steps. At the last step its $90\%$ prediction interval is $3.6$ times its average width over steps 1--100, and its $90\%$ coverage rises from $0.84$ on average to $0.985$, while its point error does not decrease (the mean absolute error of the predictive mean is $0.96$ at the last step, against $0.57$ on average).
+
+Second, for the degradation benchmarks and the synthetic systems, the CRPS is computed from the rank of the observation among the forecast samples. This score is lowest when the observation falls at the centre of the predictive distribution and does not penalise over-dispersion. As FM's samples spread out, the observations move towards their centre ($68\%$ of observations fall within the central $50\%$ of the samples at the last step, against $43\%$ on average), which lowers the score.
+
+We have now described this estimator and its properties explicitly in Section~4.1 and added the explanation to the caption of Figure~B.4. We also checked that the drop is not caused by padding or misalignment: every forecast step averages over the same 20 engines and 14 sensors, with no padding, and forecasts and targets are aligned. Excluding the last four steps changes FM's aggregate CRPS in Table~6 by $0.001$ (from $0.179$ to $0.180$), so the comparison in Table~6 is unaffected. (Interval widths, point errors and sample positions are from the stored samples of the first seed; coverage and CRPS are three-seed means.)
+}
+
+\bibliographystyle{plainnat}
+\bibliography{citations}
+
+\end{document}

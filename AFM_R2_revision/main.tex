@@ -1,0 +1,745 @@
+
+%% IJF format: single column, author--year (Harvard) references
+\documentclass[preprint,12pt,authoryear]{elsarticle}
+\journal{International Journal of Forecasting}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{bayesnet}
+\usepackage{amsmath, amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{graphicx}
+\usepackage{booktabs} % For prettier horizontal rules
+\usepackage{caption}  % For customizing captions
+\usepackage{siunitx}  % Optional: for aligning numbers (if desired)
+\usepackage{multirow}   % For the multirow cells
+\usepackage{array}  
+\usepackage{adjustbox}
+\usepackage{physics}
+\usepackage{xcolor}
+
+%% --- Revision markup ------------------------------------------------------
+%% \oldrev{} wraps text changed in the previous (R1) round: now shown in black.
+%% \rev{}    marks text changed in this (R2) round: shown in blue.
+%%            Clean version: build main_clean.tex, which defines \cleanmode before \input{main}.
+\newcommand{\oldrev}[1]{#1}
+\ifdefined\cleanmode
+  \newcommand{\rev}[1]{#1}
+\else
+  \newcommand{\rev}[1]{\textcolor{blue}{#1}}
+\fi
+%% --------------------------------------------------------------------------
+
+\begin{document}
+
+\begin{frontmatter}
+
+%% Title, authors and addresses
+
+%% use the tnoteref command within \title for footnotes;
+%% use the tnotetext command for theassociated footnote;
+%% use the fnref command within \author or \affiliation for footnotes;
+%% use the fntext command for theassociated footnote;
+%% use the corref command within \author for corresponding author footnotes;
+%% use the cortext command for theassociated footnote;
+%% use the ead command for the email address,
+%% and the form \ead[url] for the home page:
+%% \title{Title\tnoteref{label1}}
+%% \tnotetext[label1]{}
+%% \author{Name\corref{cor1}\fnref{label2}}
+%% \ead{email address}
+%% \ead[url]{home page}
+%% \fntext[label2]{}
+%% \cortext[cor1]{}
+%% \affiliation{organization={},
+%%            addressline={}, 
+%%            city={},
+%%            postcode={}, 
+%%            state={},
+%%            country={}}
+%% \fntext[label3]{}
+
+\title{Probabilistic Forecasting via Autoregressive Flow Matching} %% Article title
+
+%% use optional labels to link authors explicitly to addresses:
+%% \author[label1,label2]{}
+%% \affiliation[label1]{organization={},
+%%             addressline={},
+%%             city={},
+%%             postcode={},
+%%             state={},
+%%             country={}}
+%%
+%% \affiliation[label2]{organization={},
+%%             addressline={},
+%%             city={},
+%%             postcode={},
+%%             state={},
+%%             country={}}
+
+
+
+%% Abstract
+\begin{abstract}
+%% Text of abstract
+In this work, we introduce autoregressive flow matching (AFM) for probabilistic forecasting of multivariate timeseries data. Given historical measurements and optional future covariates, we formulate forecasting as sampling from a learned conditional distribution over future trajectories. We decompose the joint distribution of future observations into a sequence of conditional densities, each modeled via a shared flow that transforms a simple base distribution into the next observation distribution, conditioned on observed covariates. We leverage the flow matching framework, enabling scalable and simulation-free learning of these transformations.
+By combining this factorization with the flow matching objective, AFM retains the benefits of classical autoregressive models, including strong extrapolation performance, compact model size and \oldrev{improved marginal calibration relative to whole-window flow matching approaches}, while also capturing complex multi-modal conditional distributions, as seen in modern transport-based generative models. We demonstrate the effectiveness of AFM on multiple stochastic dynamical systems and real-world forecasting tasks.
+\end{abstract}
+
+%%Graphical abstract
+% \begin{graphicalabstract}
+% %\includegraphics{grabs}
+% \end{graphicalabstract}
+
+%%Research highlights
+% \begin{highlights}
+% \item Research highlight 1
+% \item Research highlight 2
+% \end{highlights}
+
+%% Keywords
+\begin{keyword}
+probabilistic forecasting \sep flow matching \sep autoregressive models \sep generative models \sep multivariate time series
+%% keywords here, in the form: keyword \sep keyword
+
+%% PACS codes here, in the form: \PACS code \sep code
+
+%% MSC codes here, in the form: \MSC code \sep code
+%% or \MSC[2008] code \sep code (2000 is the default)
+
+\end{keyword}
+
+\end{frontmatter}
+
+
+
+\section{Introduction}
+\label{sec:Introduction}
+A core problem in statistics, econometrics, and machine learning is probabilistic timeseries forecasting, where the aim is to extrapolate how system dynamics evolve into the future given observational data. This problem is central to a wide range of scientific, industrial and societal disciplines~\citep{Lim2021Timeseries,Dama2021Timeseries,Liang2024Survey}. \oldrev{Classical approaches based on ARIMA~\citep{Box1994Timeseries} and exponential smoothing~\citep{hyndman2008forecasting} have long provided tractable probabilistic forecasts for univariate and low-dimensional settings, and remain competitive benchmarks as demonstrated in the M-competition series~\citep{makridakis2020m4}. However, extending these methods to high-dimensional multivariate settings with complex, potentially multimodal predictive distributions motivates the use of flexible deep generative models.}
+
+An emerging trend is to leverage deep generative models to tackle this problem~\citep{karl2016deep, rasul2020multivariate, desai2021timevae}. In this setting, forecasting is framed as sampling from a future probability density conditioned on the past. Most notably, diffusion models and score-based generative models~\citep{sohl2015deep, ho2020denoising, song2020score} have recently pushed state-of-the-art performance in multiple forecasting benchmarks~\citep{rasul2021autoregressive, tashiro2021csdi, kollovieh2023predict, meijer2024rise}. Despite their \oldrev{strong empirical performance, diffusion models incur substantial computational costs at both training and inference time.}
+
+Flow matching (FM)~\citep{liu2022flow, albergo2023stochastic, Lipman2022} is an emerging paradigm for generative modeling that generalizes and subsumes diffusion models while offering more flexible design choices. Unlike diffusion models, which rely on iterative stochastic denoising steps over a discretized trajectory, FM learns deterministic probability paths that transforms arbitrary base distributions into the target distribution directly through continuous normalizing flows. By optimally designing these probability paths, FM circumvents the need for handcrafted noise schedules and lengthy ancestral sampling chains inherent to diffusion, enabling more efficient training and sampling. 
+
+\begin{figure*}[ht]
+   \begin{center}
+    \includegraphics[width=0.85\textwidth]{figures/fig1.pdf}
+   \end{center}
+   \caption{\oldrev{Overview of the AFM training and inference pipeline.}
+   During training, a probability path $(p^s)^{0 \leq s \leq 1}$ is constructed between a base distribution $p^0$ and the target distribution $p^1$. This probability path is generated by a velocity field $\mu$. Training is done by regressing $\mu$ via a neural network $\nu_\theta$ which takes in a sample from the probability path $\mathbf{y}^s_t$ at flow step $s$, a context vector $\mathbf{h}_t$ encoding past observations and covariates, and the current covariate $\mathbf{c}_t$. After training, sampling from the target distribution is achieved via first sampling the base distribution $p^0$, and integrating the trained velocity field via a ODE solver until $s=1$. 
+   }
+   \label{fig:overview}
+\end{figure*}
+
+Recently, FM has been applied in the context of timeseries modeling and probabilistic forecasting~\citep{Tamir2024, Hu2024, Kerrigan2024Flow, Liu2026cogenccast}, showing strong empirical results and improved computational efficiency compared to diffusion models. However, current approaches rely on directly learning the conditional distribution of an entire fixed-horizon future window conditioned on a fixed-horizon context window. While this leads to fast training and sampling, \oldrev{this design choice may limit extrapolation performance beyond the training horizon and can result in less well-calibrated marginal uncertainty estimates compared to step-wise autoregressive approaches.} Additionally, it introduces a more complex optimization problem, where models attempt to learn intricate time-dependent probability paths along the flow dimension. The latter issue is highlighted by \citet{Kerrigan2024Flow}, who propose to use informed priors based on Gaussian processes to simplify and speed up optimization. However, this restricts their approach to univariate forecasting problems.
+
+In this work, we propose autoregressive flow matching (AFM) as a simple alternative that utilizes FM to learn probabilistic forecasting models that scale to high-dimensional multivariate datasets without relying on informed priors. \oldrev{Unlike existing FM-based methods such as TSFlow~\citep{Kerrigan2024Flow} that model the entire future window simultaneously (and are consequently restricted to univariate settings due to their GP-based priors),}
+\oldrev{AFM} decomposes the forecasting problem into a sequence of conditional distributions, modeling the distribution of each future time step conditioned on past observations and covariates. This is achieved using a shared flow that transforms a simple base distribution into the next observation’s distribution. This autoregressive structure, shown in Fig.~\ref{fig:overview}, enables AFM to naturally handle variable forecasting horizons, extrapolate beyond the training distribution, and provide \oldrev{improved marginal calibration relative to whole-window flow matching approaches}, while simplifying the optimization problem. 
+
+We demonstrate that AFM achieves superior or competitive performance on both classical dynamical systems and real-world forecasting tasks, offering a practical and effective solution to probabilistic timeseries forecasting.
+
+
+
+\section{Related Work}
+\label{sec:related_work}
+
+{
+\paragraph{Classical and statistical forecasting}
+The forecasting literature has a long tradition of methods grounded in statistics and econometrics. The Box--Jenkins ARIMA family~\citep{Box1994Timeseries} and exponential smoothing state space models~\citep{hyndman2008forecasting} remain strong benchmarks for point and interval forecasting, as repeatedly demonstrated in the M-competition series~\citep{makridakis2020m4}. Probabilistic extensions of these classical methods produce prediction intervals under Gaussian or parametric assumptions, with evaluation via proper scoring rules such as the continuous ranked probability score~\citep{gneiting2007strictly} and the Winkler score~\citep{winkler1996scoring}. A comprehensive survey spanning statistical and machine learning forecasting approaches is provided by~\citet{petropoulos2022forecasting}. AFM adopts the CRPS as its primary evaluation metric, following established practice in this literature~\citep{hyndman2006another}.
+
+\paragraph{Deep learning for probabilistic forecasting}
+Recurrent neural networks and their variants have been widely applied to time series forecasting. DeepAR~\citep{salinas2020deepar} introduced autoregressive recurrent networks that learn flexible parametric output distributions (Gaussian, negative binomial), achieving competitive performance across a wide range of benchmarks. WaveNet~\citep{van2016wavenet} adapted dilated causal convolutions to sequence generation, and attention-based architectures have been explored for capturing long-range dependencies~\citep{Lim2021Timeseries}. These approaches typically assume a fixed parametric output distribution, which may be insufficient for complex multimodal or heavy-tailed predictive distributions.
+
+\paragraph{Deep generative models for forecasting}
+To move beyond parametric assumptions, generative models have been applied to learn flexible predictive distributions. Normalizing flows~\citep{rasul2020multivariate} and variational autoencoders~\citep{desai2021timevae,karl2016deep} provide tractable density estimation for multivariate time series. Diffusion models~\citep{ho2020denoising,song2020score} have achieved strong empirical results: TimeGrad~\citep{rasul2021autoregressive} applies autoregressive denoising diffusion to multivariate forecasting; CSDI~\citep{tashiro2021csdi} uses conditional score-based models for imputation and forecasting; SSSD~\citep{alcaraz2022diffusion} combines diffusion with structured state spaces; and TSDiff~\citep{kollovieh2023predict} proposes self-guided diffusion. Despite their strong performance, these models incur substantial computational costs at both training and inference time.
+
+\paragraph{Flow matching for time series}
+Flow matching~\citep{Lipman2022,liu2022flow,albergo2023stochastic} generalizes diffusion by learning deterministic probability paths via continuous normalizing flows, enabling more flexible trajectory design and efficient training. Recent work has applied FM to time series: TSFlow~\citep{Kerrigan2024Flow} uses Gaussian process priors for probabilistic forecasting but is restricted to univariate settings; FM-TS~\citep{Hu2024} and CoGenCast~\citep{Liu2026cogenccast} are concurrent FM-based approaches for time series generation and forecasting; and \citet{Tamir2024} study conditional FM for time series modelling. The present work differs from these by introducing an autoregressive factorization within the FM framework, enabling multivariate forecasting without informed priors and improving marginal calibration relative to whole-window FM approaches.
+}
+
+\section{Autoregressive flow matching}
+
+\subsection{Flow matching}
+Standard flow matching~\citep{Lipman2022} is a paradigm for generative modeling that enables training of continuous normalizing flows (CNFs)~\citep{chen2018neural, grathwohl2018ffjord} at an unprecedented scale. CNFs model data transformations as solutions to ordinary differential equations (ODEs), providing invertible mappings with tractable likelihoods.
+
+Similar to CNFs, FM aims to learn a time-dependent diffeomorphic map defined on the data space $\Omega$, called a flow $\psi \colon [0, 1] \times \Omega \to \Omega$.
+This flow transforms a sample $\mathcal{X}^0 \sim p$ from a source distribution $p$ into a target sample $\mathcal{X}^1 := \psi(\mathcal{X}^0, 1)$ such that $\mathcal{X}^1 \sim q$ for some target distribution $q$. The flow is constructed by solving the following initial value problem:
+\begin{equation}\label{eq1}
+    \dd \psi(\mathcal{X}, s
+) = \mu(\psi(\mathcal{X},s
+),s) \dd s \text{ s.~t. } \psi(\mathcal{X},0
+) = \mathcal{X} %, \quad s\in [0,1]
+\end{equation}
+where $\mu \colon \Omega \times [0, 1] \to \Omega$ is a vector field defining the velocity of the flow and generating a probability path $(p^s)^{0 \leq s \leq 1}$ where each $p^s$ is a distribution over $\Omega$ with $p^0 = p$. The objective is thus to learn a valid vector field $\mu$ such that $p^1 = q$.
+
+Unlike CNFs where the vector field is learned via likelihood maximization, requiring solving and differentiating through Eq.~\eqref{eq1} during training, FM learns a vector field $\nu_\theta$ with parameters $\theta$ by regressing over vector fields of fixed conditional probability paths. 
+This enables defining a tractable objective function called conditional flow matching (CFM) defined as:
+\begin{equation}\label{eq:cfm}
+\mathcal{L}_{\text{CFM}}(\theta) = \mathbb{E} \left\| \nu_{\theta}(\mathcal{X}, s) - \mu(\mathcal{X}, s\mid \mathcal{X}^1)\right\|^2
+\end{equation}
+where the expectation is taken over $s \sim \mathcal{U}[0, 1]$, $ \mathcal{X}^1 \sim q(\mathcal{X}^1)$ and $\mathcal{X} \sim p^s(\mathcal{X} \mid \mathcal{X}^1)$.
+
+Minimizing this objective allows sampling from $q$ by solving Eq.~\eqref{eq1} with the trained $\nu_\theta$. By avoiding gradient backpropagation through the ODE solver, FM enables stable and scalable training for high-dimensional generative tasks, such as image and video modeling~\citep{esser2024scaling, polyak2024movie}. Various probability path designs and conditioning strategies have been proposed, unifying multiple transport-based generative models under this framework~\citep{liu2022flow, albergo2023stochastic, tong2023improving}.
+
+\subsection{Autoregressive flow matching}
+\label{sec:AFM}
+
+We propose an autoregressive extension of the flow matching paradigm with the aim of improving probabilistic forecasting. 
+
+Let $\mathbf{y}_\tau \in \mathbb{R}^n$ denote an $n$-dimensional observation at time $\tau$. Given access to its $l$ past measurements including the current observation, denoted as $\mathbf{Y}_l = \{\mathbf{y}_{\tau - l}, \ldots, \mathbf{y}_{\tau}\}$, our objective is to provide probabilistic forecasts of the next $f$ future values denoted as $\mathbf{Y}_f = \{\mathbf{y}_{\tau+1}, \ldots, \mathbf{y}_{\tau+f}\}$, potentially conditioned on observed covariates $\mathbf{C} = \{\mathbf{c}_{\tau - l}, \ldots,\mathbf{c}_{\tau+f}\}$ where $\mathbf{c}_\tau \in \mathbb{R}^c$. Formally, our goal is to learn to sample from the conditional distribution $p(\mathbf{Y}_f \mid \mathbf{Y}_l, \mathbf{C})$ using a dataset $\mathcal{D}=\{(\mathbf{Y}^i_f, \mathbf{Y}^i_l, \mathbf{C}^i)\}_{i=1}^{m}$ with $m$ the number of instances.
+
+
+We propose to factorize the conditional distribution autoregressively across future time-steps under a Markov assumption of order $w$ such that:
+\begin{equation}
+p(\mathbf{Y}_f \mid \mathbf{Y}_l, \mathbf{C}) = \prod_{t=\tau+1}^{\tau+f} p(\mathbf{y}_{t} \mid \mathbf{y}_{t-w:t-1}, \mathbf{c}_{t-w:t})
+\label{eq:conditional}
+\end{equation}
+where \oldrev{$l$ is the total context available at inference time and $w \le l$ is the Markov order, i.e., the number of past steps each conditional depends on. During training, the context window $\{\mathbf{y}_{t-w:t-1}, \mathbf{c}_{t-w:t}\}$ is filled with ground-truth observations (teacher forcing); during inference it is filled with the model's own rolling predictions.}
+Our objective thus becomes learning the conditional distribution in Eq.~\eqref{eq:conditional}. 
+Instead of maximum likelihood estimation, as commonly used for autoregressive models, we employ the flow matching framework to learn this conditional distribution.
+
+
+This autoregressive factorization provides several advantages. First, it reduces the learning problem to modeling simpler conditional distributions $p(\mathbf{y}_{t} \mid \mathbf{y}_{t-w:t-1}, \mathbf{c}_{t-w:t})$ rather than a complex high-dimensional joint distribution. Second, each time step's conditional distribution can be trained within a teacher forcing framework allowing parallel training. Third, the Markov assumption with window size $w$ offers a trade-off between model capacity and computational complexity. Finally, this formulation enables interpretable uncertainty quantification by explicitly modeling how prediction uncertainty propagates through time via the chain of conditional distributions. 
+
+
+%\subsection{Constructing a target probability path}
+In autoregressive flow matching, for all future time steps $t \in [\tau+1, \tau+f]$, we define a target probability path $(p^s(\mathbf{y}_t))_{0\le s \le 1}$, with marginals $p^0(\mathbf{y}_t) = \mathcal{N}(0,I)$ and  $$p^1(\mathbf{y}_t) \approx \prod_{t=\tau+1}^{\tau+f}p(\mathbf{y}_{t} \mid \mathbf{y}_{t-w:t-1}, \mathbf{c}_{t-w:t}) \approx p_\mathcal{D}$$ where $p_\mathcal{D}$ is the empirical distribution. This probability path is generated by a flow field $\psi\colon \mathbb{R}^n \times [0,1] \to \mathbb{R}^n$ along $s$ defined via the ordinary differential equation (ODE):
+\begin{equation}\label{eq:target_flow}
+\dd \psi(\mathbf{y}_{t}, s) = \mu(\psi(\mathbf{y}_{t},s),s) \dd s \text{ s.~t. } \psi(\mathbf{y}_{t}, 0) = \mathbf{y}_{t}
+\end{equation}
+where $\mu \colon \mathbb{R}^n \times [0,1] \to \mathbb{R}^n$ is a vector field constructing the flow chosen such that the resulting flow satisfy the continuity equation.
+
+To derive a tractable objective, we can model the marginal probability path as a mixture of conditional probability paths:
+\begin{equation}
+p^s(\mathbf{y}_{t}) = \int p^s(\mathbf{y}_{t} \mid \mathbf{z})p(\mathbf{z})\dd \mathbf{z}
+\end{equation}
+where $\mathbf{z} \sim \pi_{0,1}(\mathbf{z})$ is a conditioning random variable sampled from an arbitrary data coupling $\pi_{0,1}$.
+Theorem~2 in \citet{Lipman2022} shows that the conditional velocity fields $\mu(\mathbf{y}_{t}, s\mid\mathbf{z})$ associated with the conditional probability paths $p^s(\mathbf{y}_{t} \mid \mathbf{z})$ are equivalent to their respective marginal velocity field $\mu(\mathbf{y}_{t}, s)$.
+
+Following \citet{tong2023improving}, we choose $\mathbf{z} = \{\mathbf{y}^0_t, \mathbf{y}_t^1\}$ with $p(\mathbf{z}=(\mathbf{y}_t^0, \mathbf{y}_t^1)) = p^0 \times p^1$, where $\mathbf{y}_t^0$ and $\mathbf{y}_t^1$ are samples from $p^0$ and $p^1$, respectively. We define the conditional probability path as:
+\begin{equation}
+p^s(\mathbf{y}_t \mid \mathbf{z}) = \mathcal{N}((1-s)\mathbf{y}_t^0 + s\mathbf{y}_t^1, \sigma^2 I)
+\label{eq:prob_path}
+\end{equation}
+with marginals satisfying $p^0(\mathbf{y}_t\mid\mathbf{z})= p^0(\mathbf{y}_t)$ and $p^1(\mathbf{y}_t \mid \mathbf{z}) = p^1(\mathbf{y}_t)$ for $\sigma^2 \to 0$. The respective conditional velocity field is then simply given by $\mu(\mathbf{y}_t, s\mid\mathbf{z}) = \mathbf{y}_t^1 - \mathbf{y}_t^0$.
+This choice offers straight probability paths from the source to the target distributions in Euclidean space and closed-form solutions, enabling efficient training and sampling. Learning this velocity field allows us to sample from our target distribution $p(\mathbf{y}_{t} \mid \mathbf{y}_{t-w:t-1}, \mathbf{c}_{t-w:t})$ by solving the ODE in
+Eq.~\eqref{eq:target_flow} until $s=1$. 
+
+\subsection{AFM training}
+Similar to the standard FM setting, we learn the velocity field by regressing it against a neural network $\nu_\theta$ with parameters $\theta$ using the conditional flow matching objective in Eq.~\eqref{eq:cfm}. To efficiently achieve this in our setting, we define a context vector $\mathbf{h}_t \in \mathbb{R}^h$ that encodes the \oldrev{Markov} context window at time $t$ defined as:
+\begin{equation}\label{eq:seq_model}
+\mathbf{h}_t = \zeta_\phi(\mathbf{y}_{t-w:t-1}, \mathbf{c}_{t-w:t-1})
+\end{equation}
+where $\zeta \colon \mathbb{R}^{w \times n} \times \mathbb{R}^{w \times c} \to  \mathbb{R}^h$ is a neural network with parameters $\phi$\oldrev{, and $w$ is the Markov order from Eq.~\eqref{eq:conditional}. Note that $l \ge w$: the full context $\mathbf{Y}_l$ is available at the start of inference to initialise the rolling window, but each conditional only conditions on the most recent $w$ steps}. We can then define our learning objective as: 
+\begin{equation}\label{eqn:cfm}
+\mathcal{L}(\theta, \phi) = \mathbb{E} \left\| \mu(\mathbf{y}_t^s, s \mid \mathbf{z}) - \nu_\theta(\mathbf{y}_t^s, \mathbf{h}_t, \mathbf{c}_t, s) \right\|^2 
+\end{equation}
+where the expectation is taken over $\mathbf{z} \sim \pi_{0,1}$, $s \sim \mathcal{U}(0,1)$ and $\mathbf{y}_t^s \sim p^s(\mathbf{y}_t\mid\mathbf{z})$. Training proceeds by randomly sampling an observation at time point $t$, its associated context window and covariates from $\mathcal{D}$, and jointly optimising the parameters $\phi$ and $\theta$ by minimizing $\mathcal{L}(\theta, \phi)$ via stochastic gradient descent. 
+Note that this is akin to teacher forcing~\citep{williams1989learning}, where ground-truth past observations are fed into the model during training (rather than its own past predictions), allowing parallel training across all time-steps and avoiding error accumulation. Algorithm~\ref{alg:train} summarizes the training procedure for autoregressive flow matching. 
+
+\begin{algorithm}[ht]
+\caption{AFM training.}\label{alg:train}
+\begin{small}
+\begin{algorithmic}[1]
+\Require Dataset $\mathcal{D}=\{(\mathbf{Y}_f^i,\mathbf{Y}_l^i,\mathbf{C}^i)\}_{i=1}^{m}$, window size $w$, networks $\nu_\theta$, $\zeta_\phi$
+\While{not converged}
+        \State Sample $\mathbf{y}_t^0\sim\mathcal{N}(0,I)$
+        \State Sample $(\mathbf{y}_t^1,\mathbf{y}_{t-w:t-1},\mathbf{c}_{t-w:t}) \sim \mathcal{D}$
+        \State Set $\mathbf{h}_t=\zeta_\phi(\mathbf{y}_{t-w:t-1},\mathbf{c}_{t-w:t-1})$
+        \State Sample $s\sim\mathcal{U}(0,1)$
+        \State Sample $\mathbf{y}_t^s\sim\mathcal{N}\big((1-s)\mathbf{y}_t^0+s\mathbf{y}_t^1,\sigma^2 I\big)$
+        \State Set target $\mu(\mathbf{y}_t^s,s\mid\mathbf{z})=\mathbf{y}_t^1-\mathbf{y}_t^0$
+        \State Set  $\mathcal{L}_t=\|\mu(\mathbf{y}_t^s,s\mid\mathbf{z})-\nu_\theta(\mathbf{y}_t^s,\mathbf{h}_t,\mathbf{c}_t,s)\|^2$
+        \State Update $\theta,\phi$ to minimize the loss
+\EndWhile
+\State \Return $\nu_\theta$, $\zeta_\phi$
+\end{algorithmic}
+\end{small}
+\end{algorithm}
+
+
+
+\subsection{AFM inference}
+After training, we wish to provide probabilistic predictions for new  observations $\mathbf{Y}_l$ and corresponding covariates $\mathbf{C}$ for $f$ future timestamps into the future. 
+For this we follow the sampling procedure in Algorithm~\ref{alg:sample}, where predictions are made autoregressively using a rolling-window approach. This procedure can be repeated many times to obtain empirical quantiles of the uncertainty of our predictions.
+
+
+\begin{algorithm}
+\caption{AFM inference.}\label{alg:sample}
+\begin{small}
+\begin{algorithmic}[1]
+\Require Past observations $\mathbf{Y}_l$, covariates $\mathbf{C}$, forecast horizon $f$, window size $w$, networks $\nu_\theta$, $\zeta_\phi$
+\State Initialize $\mathbf{Y}_{f} \gets \mathbf{Y}_l$
+\For{$t=\tau+1$ \textbf{to} $\tau+f$}
+    \State Set context $\mathbf{h}_t = \zeta_\phi(\mathbf{y}_{t-w:t-1}, \mathbf{c}_{t-w:t-1})$ using the last $w$ entries in $\mathbf{Y}_{f}$
+    \State Sample $\mathbf{y}_t^0 \sim \mathcal{N}(0,I)$
+    \State Set $\psi(\mathbf{y}_t,0)=\mathbf{y}_t^0$
+    \State Solve $
+    \dv{\psi(\mathbf{y}_t,s)}{s}=\nu_\theta(\psi(\mathbf{y}_t,s),\mathbf{h}_t,\mathbf{c}_t,s)$ for $s\in[0,1]$
+    \State Append $\psi(\mathbf{y}_t,1)$ to $\mathbf{Y}_{f}$
+\EndFor
+\State \Return $\mathbf{Y}_{f}$
+\end{algorithmic}
+\end{small}
+\end{algorithm}
+
+
+\begin{table*}[!tbp]
+\centering
+\small
+\caption{Summary of stochastic dynamical systems. \(\mathbf{f}(\mathbf{x})\) denotes the drift function, \(\boldsymbol{\Theta}\) the system parameters, \(\boldsymbol{\sigma}\) the constant diffusion term, and \(p(\mathbf{x}(0))\) the initial condition distribution. Each system was integrated over the given interval \([t_0, t_1]\) with 200 steps using the Euler–Heun method.}
+\label{tab:sde_specs}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{l l l l l l}
+\toprule
+\textbf{System} &  \(f(\mathbf{x})\) & \(\boldsymbol{\Theta}\) & \(\boldsymbol{\Sigma}\) &  \(p(\mathbf{x}(0))\) & \( [t_0, t_1] \) \\
+\midrule
+\textbf{Lorenz} 
+& \(\begin{aligned}
+   f_1 &= \sigma\,(x_2 - x_1)\\
+   f_2 &= x_1(\rho - x_3) - x_2\\
+   f_3 &= x_1\,x_2 - \beta\,x_3
+   \end{aligned}\) 
+& \(\begin{aligned}
+   \sigma &= 10\\
+   \rho &= 28\\
+   \beta &= \tfrac{8}{3}
+   \end{aligned}\)
+& \((1.5,\,1.5,\,1.5)\)
+& \(\mathcal{U}([0,10])\)
+& \([0, 2]\) \\
+\midrule
+\textbf{FitzHugh--Nagumo} 
+& \(\begin{aligned}
+   f_1 &= x_1 - \tfrac{x_1^3}{3} - x_2 + I\\
+   f_2 &= \tfrac{x_1 + a - b\,x_2}{\tau}
+   \end{aligned}\)
+& \(\begin{aligned}
+   a &= 0.7\\
+   b &= 0.8\\
+   \tau &= 12.5\\
+   I &= 0.5
+   \end{aligned}\)
+& \((1.5,\,1.5)\)
+& \(\mathcal{U}([-2,2])\)
+& \([0, 10]\) \\
+\midrule
+\textbf{Lotka--Volterra}
+& \(\begin{aligned}
+   f_1 &= \alpha\,x_1 - \beta\,x_1\,x_2\\
+   f_2 &= -\delta\,x_2 + \gamma\,x_1\,x_2
+   \end{aligned}\)
+& \(\begin{aligned}
+   \alpha &= 1.3\\
+   \beta &= 0.9\\
+   \gamma &= 0.8\\
+   \delta &= 1.8
+   \end{aligned}\)
+& \((1.5,\,1.5)\)
+& \(\mathcal{U}([0,5])\)
+& \([0, 20]\) \\
+\midrule
+\textbf{Brusselator}
+& \(\begin{aligned}
+   f_1 &= A + x_1^2\,x_2 - (B+1)\,x_1\\
+   f_2 &= B\,x_1 - x_1^2\,x_2
+   \end{aligned}\)
+& \(\begin{aligned}
+   A &= 1.0\\
+   B &= 3.0
+   \end{aligned}\)
+& \((1.5,\,1.5)\)
+& \(\mathcal{U}([0,2])\)
+& \([0, 20]\) \\
+\midrule
+\textbf{Van der Pol}
+& \(\begin{aligned}
+   f_1 &= x_2\\
+   f_2 &= \mu\,(1 - x_1^2)\,x_2 - x_1
+   \end{aligned}\)
+& \(\begin{aligned}
+   \mu &= 0.1
+   \end{aligned}\)
+& \((1.5,\,1.5)\)
+& \(\mathcal{U}([-2,2])\)
+& \([0, 20]\) \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table*}
+
+
+\section{Experimental validation}
+In this section, we present our empirical results and compare AFM against various baselines using both data generated via simulating various dynamical systems and publicly available data for real-world use cases. %% Code link omitted for review (Ahmed, R2); add https://github.com/elgazzarr/afm at acceptance. 
+
+\subsection{Simulation experiments}\label{subsec:dynamical_systems}
+
+\paragraph{Data} We evaluated AFM on the task of forecasting five different stochastic dynamical systems: stochastic versions of the Lorenz system~\citep{lorenz1963deterministic}, FitzHugh–Nagumo model~\citep{fitzhugh1961impulses}, Lotka-Volterra system~\citep{lotka1925elements}, Brusselator~\citep{lefever1968symmetry}, and Van der Pol oscillator~\citep{vanderpol1926relaxation}. 
+
+For each system, we generated trajectories by numerically solving the corresponding stochastic differential equations (SDEs), using randomly sampled initial conditions and Brownian motion realizations.
+%The details of the dynamical systems and the data generation process are provided in Appendix~\ref{appendix:data_ds}.
+%We generated training and testing data for five classical stochastic dynamical systems, that is, Lorenz, FitzHugh-Nagumo, Lotka-Volterra, Brusselator and Van der Pol, by numerically integrating their corresponding stochastic differential equations (SDEs). 
+Each system has the general form
+$$
+  \dd \mathbf{x}(t) \;=\; \mathbf{f}\bigl(\mathbf{x}(t),t;\boldsymbol{\Theta}\bigr)\,\dd t 
+  \;+\; \boldsymbol{\sigma}\,\dd \mathbf{W}(t)
+$$
+where \(f\) is the deterministic drift, \(\boldsymbol{\Theta}\) are the system parameters, \(\boldsymbol{\sigma}\) is a constant diffusion term, and \(\mathbf{W}(t)\) is standard Brownian motion.
+We sampled \(\;2400\) random initial conditions from a uniform distribution over the specified range (see Table~\ref{tab:sde_specs}) for each system and generated a trajectory for each initial condition by solving the SDE using the Euler-Heun method with fixed step size.  We sampled \(200\) equally spaced time points for each trajectory. Out of the \(200\) time points in each trajectory, the first \(75\) were used as observed data, the next \(75\) for prediction, and the final \(50\) for extrapolation. Out of the 2400 trajectories generated, we used 2000 for training and 400 for testing.
+
+
+
+\paragraph{Implementation details} For these experiments we set $\zeta_\phi$ as a two-layer bi-directional LSTM with 64 hidden units, and set $\nu_{\theta}$ as a multi-layer perceptron with three hidden layers of size 64. We use Fourier positional embeddings to encode the flow step $s$ into a 16-dimensional vector using a fixed set of frequencies and set the context length $w$ to be equal to the prediction length. We trained our models via stochastic gradient descent using an Adam optimizer with a learning rate of $0.003$ and a batch size of $128$. Training until convergence took $\sim$7 minutes on a single A100-SXM4-40GB NVIDIA GPU. 
+
+\begin{table*}[!ht]
+    \centering
+    \caption{Performance comparison of autoregressive (AFM) vs non-autoregressive (FM) factorization in our method for five different stochastic dynamical systems. Performance is compared in terms of average CRPS and NRMSE on the \rev{400 held-out test trajectories, no part of which is seen during training. Scores are reported separately for forecast steps within the horizon used during training (steps 76--150) and beyond it (steps 151--200).}
+    Reported results are the mean and standard deviation across five different random seeds. \oldrev{Best results in bold.}}
+    \renewcommand{\arraystretch}{1.2}
+    \setlength{\tabcolsep}{6pt}
+    \begin{adjustbox}{max width=\textwidth}
+    \begin{tabular}{l l cc cc}
+        \toprule
+        \multirow{3}{*}{\textbf{System}} & \multirow{3}{*}{\textbf{Factorization}} & 
+        \multicolumn{2}{c}{\rev{\textbf{Within training horizon}}} & \multicolumn{2}{c}{\rev{\textbf{Beyond training horizon}}} \\
+        & & \multicolumn{2}{c}{\rev{(steps 76--150)}} & \multicolumn{2}{c}{\rev{(steps 151--200)}} \\
+        \cmidrule(lr){3-4} \cmidrule(lr){5-6}
+        & & $\overline{\text{CRPS}}$ \(\downarrow\) & NRMSE \(\downarrow\) & $\overline{\text{CRPS}}$ \(\downarrow\) & NRMSE \(\downarrow\) \\
+        \midrule
+        \multirow{2}{*}{Lorenz} 
+            & FM   & $0.147 \pm 0.012$ & $0.242 \pm 0.018$ & $\textbf{0.120} \pm 0.009$ & $0.301 \pm 0.024$ \\
+            & AFM \oldrev{(ours)} & $\textbf{0.090} \pm 0.008$ & $\textbf{0.017} \pm 0.003$ & $0.137 \pm 0.011$ & $\textbf{0.048} \pm 0.006$ \\
+        \midrule
+        \multirow{2}{*}{FitzHugh-Nagumo} 
+            & FM  & $0.165 \pm 0.014$ & $0.131 \pm 0.011$ &  $0.214 \pm 0.016$ & $0.306 \pm 0.022$ \\
+            & AFM \oldrev{(ours)} & $\textbf{0.144} \pm 0.013$ & $\textbf{0.090} \pm 0.007$ & $\textbf{0.146} \pm 0.012$ & $\textbf{0.278} \pm 0.019$ \\
+        \midrule
+        \multirow{2}{*}{Lotka-Volterra} 
+            & FM  & $0.130 \pm 0.011$ & $0.266 \pm 0.019$ & $0.136 \pm 0.012$ & $0.502 \pm 0.033$ \\
+            & AFM \oldrev{(ours)} & $\textbf{0.126} \pm 0.010$ & $\textbf{0.189} \pm 0.015$ & $\textbf{0.123} \pm 0.009$ & $\textbf{0.339} \pm 0.026$ \\
+        \midrule
+        \multirow{2}{*}{Brusselator} 
+            & FM  & $0.217 \pm 0.016$ & $0.658 \pm 0.042$ & $0.238 \pm 0.019$ & $1.046 \pm 0.057$ \\
+            & AFM \oldrev{(ours)} & $\textbf{0.125} \pm 0.011$ & $\textbf{0.031} \pm 0.004$ & $\textbf{0.109} \pm 0.008$ & $\textbf{0.023} \pm 0.003$ \\
+        \midrule
+        \multirow{2}{*}{Van der Pol} 
+            & FM  & $\textbf{0.143} \pm 0.012$ & $0.161 \pm 0.014$ & $\textbf{0.211} \pm 0.018$ & $0.510 \pm 0.031$ \\
+            & AFM \oldrev{(ours)} & $0.225 \pm 0.017$ & $\textbf{0.051} \pm 0.005$ & $0.282 \pm 0.021$ & $\textbf{0.101} \pm 0.009$ \\
+        \bottomrule
+    \end{tabular}
+    \end{adjustbox}
+    \label{table:dynamical_systems}
+\end{table*}
+
+\paragraph{Baselines} To evaluate the effectiveness of the autoregressive factorization in AFM, we compared our approach against a non-autoregressive flow-matching baseline, which directly models the joint distribution of future observations conditioned on past observations and covariates, that is,  ${p^1 =p(\mathbf{Y}_f \mid \mathbf{Y}_l, \mathbf{C})}$. 
+\oldrev{This approach serves as a representative non-autoregressive FM baseline; note that it differs from AFM in prior distribution and architecture in addition to factorization.} Note that this non-autoregressive formulation closely resembles the method proposed by \citet{Kerrigan2024Flow}. Further details on this baseline are provided in~\ref{app:nafm}.
+
+
+\paragraph{Evaluation metrics}
+\rev{To assess performance both within and beyond the forecast horizon used during training, we partitioned each trajectory into three segments: (1) an observation window (steps 1--75), which serves as the conditioning input to the model; (2) a within-training-horizon window (steps 76--150), which, for the \emph{training} trajectories, is the forecast target used to fit the model; and (3) a beyond-training-horizon window (steps 151--200), which the model is never trained to forecast. All reported metrics are computed on the 400 held-out \emph{test} trajectories, no part of which is used for training. For these trajectories, both the within- and beyond-horizon windows are therefore genuinely out-of-sample; the two windows differ only in whether the forecast steps lie inside or outside the horizon length the model was trained on.} Given an $n$-dimensional time series $\mathbf{Y}_f = \{\mathbf{y}_{\tau+1}, \ldots, \mathbf{y}_{\tau+f}\}$ and its predictive distribution or samples from our probabilistic model, we used the continuous ranked probability score (CRPS)~\citep{gneiting2007strictly} for evaluating the performance of the model in uncertainty quantification and the normalized root mean square error (NRMSE)~\citep{hyndman2006another} to assess \oldrev{prediction accuracy}.
+%See Appendix~\ref{app:evaluation_metrics} for more details about the employed evaluation metrics.
+
+%\paragraph{Continuous ranked probability score}
+The continuous ranked probability score (CRPS) is a proper scoring rule commonly used to assess the quality of probabilistic forecasts. For a univariate random variable $X$ with cumulative distribution function (CDF) $F_X$ and an observed value $x$, the CRPS is defined as:
+\begin{equation}
+    \text{CRPS}(F_X, x) = \int_{-\infty}^{+\infty} \bigl(F_X(y) - \mathbf{1}\{y \geq x\}\bigr)^2 \, \dd y,
+\end{equation}
+where $\mathbf{1}\{\cdot\}$ is the indicator function. Intuitively, the CRPS evaluates how well the entire predictive distribution aligns with the observation $x$. Lower CRPS values indicate better-calibrated and more accurate predictive distributions.
+In the context of time series forecasting, we can compute the CRPS for each time step in the forecasting horizon and average the results:
+\oldrev{$\overline{\text{CRPS}} = \tfrac{1}{f} \sum_{k=1}^{f} \text{CRPS}\bigl(F_{X_{\tau+k}}, y_{\tau+k}\bigr)$},
+where $F_{X_{\tau+k}}$ is the predicted CDF (or an empirical CDF from samples) at forecast horizon $k$, and $y_{\tau+k}$ is the corresponding ground-truth observation.
+\rev{For the synthetic systems (Table~\ref{table:dynamical_systems}) and the degradation benchmarks (Table~\ref{tab:realworld_degradation} and \ref{app:degradation}), we compute this score from $S$ forecast samples sorted as $x_{(1)} \leq \cdots \leq x_{(S)}$ by evaluating the integrand at the samples and averaging with equal weights, $\widehat{\text{CRPS}} = \tfrac{1}{S}\sum_{i=1}^{S} \bigl(\tfrac{i}{S} - \mathbf{1}\{x_{(i)} \geq y\}\bigr)^2$. This amounts to integrating with respect to the predictive distribution rather than over the real line: the score depends only on the rank of the observation among the samples, ranging from $1/12$ (observation at the predictive median) to $1/3$ (observation outside the range of the samples), and it does not penalise an over-dispersed predictive distribution. It therefore reflects where the observation falls within the predictive distribution rather than its sharpness, which is why we report it alongside NRMSE and, for the degradation benchmarks, prediction-interval coverage. The real-world results in Table~\ref{tab:forecasting} instead use the standard quantile-based CRPS computed by GluonTS (Section~\ref{subsec:realworld}).}
+
+\begin{figure*}[!t]
+   \begin{center}
+    \includegraphics[width=\textwidth]{figures/fig2_r2.pdf}
+   \end{center}
+   \caption{\rev{Example probabilistic forecasts from AFM (top row) and the non-autoregressive FM baseline (bottom row) for one held-out test trajectory per dynamical system. Solid lines: ground truth; dashed lines: predictive mean; shaded bands: 95\% prediction intervals. Grey: observed window (model input, steps 1--75). Blue: within the training horizon (steps 76--150). Yellow: beyond the training horizon (steps 151--200). All trajectories shown belong to the held-out test set, so no part of them (in either the blue or the yellow window) was seen during training.}}
+   \label{fig:samples}
+\end{figure*}
+
+%\subsection{Normalized root mean square error}
+The root mean square error (RMSE) is a standard metric for evaluating the accuracy of point forecasts. For a set of predictions $\{\hat{y}_{\tau+1}, \ldots, \hat{y}_{\tau+f}\}$ and corresponding ground-truth values $\{y_{\tau+1}, \ldots, y_{\tau+f}\}$, the RMSE is:
+\begin{equation}
+    \text{RMSE} = \sqrt{ \frac{1}{f} \sum_{k=1}^{f} \bigl(\hat{y}_{\tau+k} - y_{\tau+k}\bigr)^2 }.
+\end{equation}
+\oldrev{To facilitate comparison across datasets of different magnitudes, we normalize by the sample standard deviation of the ground-truth series, giving $\text{NRMSE} = \text{RMSE}/\sigma_{y}$. A lower NRMSE indicates better predictive accuracy relative to the variability of the time series.}
+
+
+
+
+
+
+
+\paragraph{Results}
+Our results, summarized in Table~\ref{table:dynamical_systems}, demonstrate that the autoregressive factorization employed in AFM significantly improves forecasting performance across multiple stochastic dynamical systems. \rev{Within the training horizon}, the AR approach outperforms the FM baseline in terms of NRMSE across all five systems, with particularly dramatic improvements observed in the Lorenz (0.017 vs 0.242) and Brusselator (0.031 vs 0.658) systems, representing reductions in error of $93\%$ and $95\%$, respectively. The AR factorization also yields superior CRPS in four of the five systems, with only the Van der Pol oscillator showing better uncertainty quantification with the FM approach. More importantly, these improvements extend \rev{beyond the training horizon}, where autoregressive factorization maintains its advantage in NRMSE across all systems, demonstrating its superior ability to \rev{forecast beyond the horizon it was trained on}. This is particularly evident in the Brusselator system, where AR factorization reduces the \rev{beyond-horizon} NRMSE by $98\%$ (0.023 vs 1.046). 
+
+
+\oldrev{An exception is Van der Pol, where FM achieves lower CRPS than AFM despite AFM winning on NRMSE. Van der Pol with $\mu=0.1$ is a nearly harmonic oscillator with smooth, low-entropy dynamics; in this regime the FM baseline's trajectory-level prior may better match the shape of the marginal predictive distribution, while AFM's step-wise sampling is more accurate in mean trajectory but yields slightly different marginal shapes due to autoregressive error propagation.}
+
+Figure~\ref{fig:samples} illustrates the forecasting results for AFM compared to FM by generating future trajectories for four dynamical systems conditioned on observed data \rev{from held-out test trajectories}. AFM is shown to have much lower variance compared to the FM baseline, even allowing for accurate extrapolation of the dynamics beyond the \rev{forecast horizon} it was trained on. These results confirm that modeling the temporal dependencies through autoregressive factorization enables AFM to better capture the underlying dynamics of complex stochastic systems, leading to more accurate predictions and improved uncertainty quantification, especially in challenging extrapolation scenarios.
+
+\subsection{Real-world datasets}\label{subsec:realworld}
+
+\paragraph{Data} We evaluated AFM on the tasks
+of forecasting multiple univariate and multivariate timeseries with different frequencies (hourly and daily) from GluonTS~\citep{alexandrov2020gluonts}. Specifically, we used the following datasets: Electricity~\citep{lai2018modeling}, Solar~\citep{lai2018modeling}, Exchange~\citep{dua2017uci}, Traffic~\citep{dua2017uci}, and Wikipedia~\citep{gasthaus2019probabilistic}. 
+%We provide further details in Appendix~\ref{appendix:data_emp}.
+%We used five different datasets from GluonTS~\citep{alexandrov2020gluonts} 
+%to evaluate our model performance. Specifically, 
+We used the versions preprocessed as in \citet{salinas2019high}. \oldrev{Evaluation is performed on a held-out test set consisting of trajectories never seen during training; the model is trained exclusively on the training split and all reported metrics are computed on this separate test partition.} A summary of their properties is listed in Table~\ref{tab:dataset-details}.
+
+\begin{table}
+\centering
+\small
+\caption{Properties of the datasets used in the experiments: dimension \( n \), domain \( \Omega \), frequency, total training timesteps $T$, and prediction length $L$.}
+\label{tab:dataset-details}
+\begin{small}
+\begin{tabular}{llccccc}
+\toprule
+Dataset & $n$ & $\Omega$ & freq. & $T$ & $L$\\
+\midrule
+Electricity  & 370 & $\mathbb{R}^+$ & hourly & 5833 & 24\\
+Exchange & 8 & $\mathbb{R}^+$ & daily & 6071 & 30 \\
+Solar & 137 & $\mathbb{R}^+$ & hourly & 7009 & 24 \\
+Traffic & 963 & $(0,1)$ & hourly & 4001 & 24\\
+Wikipedia & 2000 & $\mathbb{N}$ & daily & 792 & 30\\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+
+
+\begin{table*}[!tbp]
+  \centering
+  \setlength{\tabcolsep}{4pt}
+  \caption{\oldrev{Test set CRPS comparison (lower is better). The reported metric is \texttt{mean\_wQuantileLoss} computed by GluonTS \texttt{MultivariateEvaluator} on \texttt{SampleForecast} objects, over quantile grid $\{0.05, 0.10, \ldots, 0.95\}$, averaged over dimensions. This corresponds to marginal univariate CRPS averaged over dimensions.} Mean and standard error metrics for AFM obtained by re-training and evaluating five times. \rev{Rows marked $^\dagger$ were computed by us with \texttt{statsforecast} under exactly the same windows, evaluator and quantile grid as AFM, from quantile forecasts (Section~\ref{subsec:realworld}); results for all other baselines are taken from \citet{Kerrigan2024Flow} (for TSFlow, the conditional model as reported in the first arXiv version) and \citet{rasul2021autoregressive}. The naive forecast is reported only for the non-seasonal Exchange dataset and the multi-seasonal methods only for the hourly datasets with daily and weekly seasonality; ``--'' marks combinations that are not applicable.} \oldrev{Best scores in bold and second best underlined.}}
+  \label{tab:forecasting}
+  %% SN / AutoARIMA / AutoETS are quoted (no dagger); their values were checked against the source (R2_RESULTS.md).
+\begin{adjustbox}{max width=\textwidth}
+\begin{small}
+  \begin{tabular}{lccccc}
+    \toprule
+    Method & Electricity & Exchange & Solar & Traffic & Wikipedia \\
+    \midrule
+    \multicolumn{6}{l}{\textit{Statistical baselines}} \\
+    \rev{Naive$^\dagger$}                 & -- & \rev{$\textbf{0.007} \pm 0.000$} & -- & -- & -- \\
+    SN \rev{(single season)}              & \rev{$0.069 \pm 0.000$} & \rev{--} & $0.512 \pm 0.000$ & $0.221 \pm 0.000$ & $0.423 \pm 0.000$ \\
+    \oldrev{AutoARIMA} \rev{(single season)} & $0.344 \pm 0.000$ & \rev{$\underline{0.008} \pm 0.000$} & $0.558 \pm 0.003$ & $0.486 \pm 0.000$ & $0.654 \pm 0.000$ \\
+    \oldrev{AutoETS} \rev{(single season)}   & \rev{$0.055 \pm 0.000$} & \rev{$\underline{0.008} \pm 0.000$} & $0.550 \pm 0.000$ & $0.492 \pm 0.000$ & $0.651 \pm 0.000$ \\
+    \rev{MSTL-ETS$^\dagger$ (24, 168)}    & \rev{$0.058 \pm 0.000$} & -- & \rev{$0.520 \pm 0.000$} & \rev{$0.248 \pm 0.000$} & -- \\
+    \rev{DHR-ARIMA$^\dagger$ (24, 168)}   & \rev{$0.066 \pm 0.000$} & -- & \rev{$0.460 \pm 0.000$} & \rev{$0.202 \pm 0.000$} & -- \\
+    \midrule
+    \multicolumn{6}{l}{\textit{Deep learning baselines}} \\
+    DeepAR           & $0.051 \pm 0.000$ & $0.013 \pm 0.004$ & $0.429 \pm \rev{0.055}$ & $0.103 \pm \rev{0.002}$ & $0.215 \pm 0.003$ \\
+    WaveNet          & $0.058 \pm 0.008$ & $0.012 \pm 0.001$ & $0.360 \pm \rev{0.009}$ & $0.099 \pm \rev{0.002}$ & $\textbf{0.207} \pm \rev{0.003}$ \\
+    CSDI             & $0.051 \pm 0.000$ & $0.013 \pm \rev{0.001}$ & $0.360 \pm \rev{0.006}$ & $0.152 \pm \rev{0.001}$ & $0.318 \pm 0.012$ \\
+    SSSD             & $0.048 \pm \rev{0.001}$ & \rev{$0.010 \pm 0.001$} & \rev{$0.384 \pm 0.023$} & \rev{$0.097 \pm 0.002$} & $\underline{0.209} \pm \rev{0.004}$ \\
+    TimeGrad         & $0.048 \pm 0.001$ & $0.013 \pm 0.002$ & $0.347 \pm 0.024$ & $0.109 \pm 0.002$ & $0.311 \pm 0.002$ \\
+    TSFlow           & $\underline{0.045} \pm 0.001$ & \rev{$0.009 \pm 0.001$} & $\underline{0.343} \pm 0.002$ & $\textbf{0.083} \pm 0.000$ & $0.227 \pm 0.000$ \\
+    \midrule
+    AFM \oldrev{(ours)}       & $\textbf{0.042} \pm 0.001$ & \rev{$0.009 \pm 0.001$} & $\textbf{0.284} \pm 0.002$ & $\underline{0.089} \pm 0.000$ & $0.243 \pm 0.002$ \\
+    \bottomrule
+  \end{tabular}
+\end{small}
+\end{adjustbox}
+\end{table*}
+
+\paragraph{Implementation details} We set $\zeta_\phi$ as a three-layer bi-directional LSTM with 64 hidden units. We defined $\nu_\theta$ via a residual neural network with five residual blocks implemented via 1-D convolutional layers with gated activation functions~\citep{van2016wavenet, kong2020diffwave}. The architecture is similar to the network used by \citet{rasul2021autoregressive} but with fewer residual blocks. We used Fourier positional embeddings to encode the flow step $s$ into a 32-dimensional vector using a fixed set of frequencies. We used the same embedding technique to encode time-dependent covariates $\mathbf{c}$. We trained our models via stochastic gradient descent using an Adam optimizer with a learning rate of $0.001$ and a batch size of $128$. Depending on the dataset, training until convergence took from $40-100$ minutes on a single A100-SXM4-40GB NVIDIA GPU. 
+
+
+\paragraph{Baselines} We compared AFM against multiple established baselines. \rev{Following \citet{hewamalage2023forecast}, the statistical benchmarks are matched to the characteristics of each dataset. For Exchange, whose daily exchange rates exhibit no seasonality, the appropriate benchmark is the naive (random-walk) forecast, which repeats the last observed value, with Gaussian prediction intervals whose variance grows linearly with the horizon; random-walk forecasts are notoriously difficult to beat for exchange rates \citep{meese1983empirical}. The hourly datasets (Electricity, Solar and Traffic) exhibit both daily ($m_1=24$) and weekly ($m_2=168$) seasonal cycles, so for these we include two methods designed for multiple seasonal patterns \citep{hyndman2025fpppy}: (i) MSTL-ETS, which removes both seasonal components by MSTL decomposition \citep{bandara2025mstl}, forecasts the seasonally adjusted series with AutoETS, and forecasts each seasonal component with a seasonal naive method; and (ii) dynamic harmonic regression (DHR-ARIMA), an ARIMA model with $K_1$ and $K_2$ Fourier pairs for the daily and weekly periods, respectively, as regressors, where the ARIMA orders are selected automatically and $(K_1, K_2) \in \{2, 4, 6\}^2$ was chosen per dataset by minimising the AICc summed over 20 randomly selected series, giving $(6, 4)$, $(6, 2)$ and $(6, 6)$ for Electricity, Solar and Traffic, respectively. For reference, we also report Seasonal Naive (SN), AutoARIMA and AutoETS \citep{hyndman2008forecasting} with a single seasonal period ($m=24$ for the hourly datasets; SN uses $m=30$ for the daily datasets), which cannot represent both seasonal cycles simultaneously. All statistical baselines computed by us were fitted per series with \texttt{statsforecast} (version 2.1.1) \citep{garza2022statsforecast} at the same forecast origins and horizons (test windows) as AFM, using all observations before each forecast origin for the naive forecast and the most recent $1344$ observations (eight weeks) for MSTL-ETS and DHR-ARIMA, and were evaluated with the same evaluator and quantile grid; predictive quantiles $0.05, 0.10, \ldots, 0.95$ were obtained from the models' Gaussian prediction intervals at levels $10\%, 20\%, \ldots, 90\%$, with the point forecast as the median, and forecasts were clipped to each dataset's domain $\Omega$ (Table~\ref{tab:dataset-details}).}
+The deep learning baselines comprise DeepAR~\citep{salinas2020deepar} and WaveNet~\citep{van2016wavenet}\rev{, the} diffusion baselines \oldrev{CSDI~\citep{tashiro2021csdi},} SSSD~\citep{alcaraz2022diffusion}, and TimeGrad~\citep{rasul2021autoregressive}\rev{, and the} flow matching baseline TSFlow~\citep{Kerrigan2024Flow}.
+
+
+
+\begin{table*}[htbp]
+  \centering
+  \caption{\oldrev{Model efficiency comparison. Columns show number of parameters, inference time per forecast, and CRPS on Electricity and Solar (lower is better for all three). AFM achieves the best predictive accuracy with the smallest model size, while being approximately $4\times$ slower than the non-autoregressive TSFlow but significantly faster than TimeGrad. The accuracy and speed columns are independent metrics; lower CRPS does not imply faster inference.}}
+  \label{tab:efficiency}
+\begin{small}
+  \begin{tabular}{lccccc}
+    \toprule
+    Method & Parameters & Inference Time & Electricity & Solar \\
+    \midrule
+    TSFlow   & \phantom{0}4.1M & \phantom{0}\textbf{45ms}  & $0.045 \pm 0.001$ & $0.343 \pm 0.002$ \\
+    TimeGrad & \phantom{0}2.8M & 850ms & $0.048 \pm 0.001$ & $0.347 \pm 0.024$ \\
+    AFM \oldrev{(ours)} & \textbf{0.85M} & 180ms & $\textbf{0.042} \pm 0.001$ & $\textbf{0.284} \pm 0.002$ \\
+    \bottomrule
+  \end{tabular}
+  \end{small}
+\end{table*}
+
+\paragraph{Results}
+Table~\ref{tab:forecasting} presents the comparison of our proposed AFM model against various baselines on five real-world timeseries datasets. \rev{The results show that AFM is competitive with strong baselines, achieving the best CRPS on two of the five datasets (Electricity and Solar).} On the Electricity dataset, AFM outperforms all baselines with a CRPS of 0.042, representing a $6.7\%$ improvement over the second-best model, TSFlow (0.045), and a $12.5\%$ improvement over the autoregressive diffusion baseline TimeGrad (0.048). \rev{On the Exchange dataset, the best CRPS is obtained by the naive (random-walk) forecast (0.007), followed by AutoARIMA and AutoETS (both 0.008) and by AFM and TSFlow (both 0.009 $\pm$ 0.001); AFM does not improve on the naive forecast here, and the classical methods differ from one another by at most 0.001. That simple benchmarks are hard to beat on this dataset is consistent with the well-known near-random-walk behaviour of exchange rates \citep{meese1983empirical}.}
+Most notably, on the Solar dataset, AFM achieves a substantial improvement with a CRPS of 0.284, representing a $17.2\%$ reduction in error compared to TSFlow (0.343) and an $18.2\%$ improvement over TimeGrad (0.347). \oldrev{On the Traffic dataset, AFM (0.089 $\pm$ 0.000) falls behind TSFlow (0.083 $\pm$ 0.000); while the difference is small, it is consistent across runs. On the Wikipedia dataset, WaveNet (0.207) and SSSD (0.209) achieve the best performance, with AFM (0.243) behind both TSFlow (0.227) and those baselines.} \rev{On the three hourly datasets, the multi-seasonal baselines improve on the single-season ones in most but not all cases. DHR-ARIMA (0.066, 0.460 and 0.202 on Electricity, Solar and Traffic) is the best statistical method on Solar and Traffic, whereas on Electricity the single-season AutoETS (0.055) remains best, ahead of MSTL-ETS (0.058) and DHR-ARIMA. MSTL-ETS improves on the single-season AutoARIMA and AutoETS on Solar (0.520) and Traffic (0.248), but not on the seasonal naive forecast. All statistical baselines remain well behind the deep probabilistic models on these datasets.}
+
+\paragraph{Efficiency}
+Table~\ref{tab:efficiency} presents the computational efficiency analysis. AFM achieves the best predictive performance with the smallest model size (0.85M parameters compared to 4.1M for TSFlow and 2.8M for TimeGrad). In terms of inference time, AFM requires 180ms per forecast, which is ~4× slower than the non-autoregressive TSFlow (45ms) but significantly faster than the autoregressive diffusion baseline TimeGrad (850ms). \oldrev{We note that AFM and TSFlow use different architectures and implementations, so this comparison should be interpreted as a rough order-of-magnitude characterization rather than a definitive efficiency benchmark. The slower inference of AFM relative to TSFlow reflects the sequential nature of autoregressive sampling and represents a trade-off against the extrapolation and multivariate scaling benefits.} These results demonstrate that the autoregressive flow-matching approach employed in AFM delivers competitive performance across diverse real-world timeseries forecasting tasks, with favorable trade-offs between model size, inference speed, and predictive accuracy.
+
+{\paragraph{Additional physical-degradation benchmarks.} To broaden the evaluation beyond standard forecasting corpora, we additionally assess AFM on two physical-degradation datasets widely used in the prognostics literature: the NASA Li-ion Battery Aging dataset (capacity-fade forecasting under a leave-one-battery-out protocol) and the NASA C-MAPSS turbofan dataset (multivariate sensor-trajectory forecasting). We report a three-seed comparison of the autoregressive (AFM) and non-autoregressive (FM) factorizations, together with the calibration (prediction-interval coverage), horizon-resolved CRPS, and cross-channel correlation-structure diagnostics summarized in Table~\ref{tab:realworld_degradation}; the per-horizon diagnostics and forecast visualizations are provided in \ref{app:degradation}. On the turbofan benchmark, AFM attains lower CRPS than FM over the near-to-mid forecast horizon and reproduces the empirical cross-sensor correlation structure more closely, whereas the whole-window FM is preferable at very long horizons. On the smoother battery capacity-fade signal, where per-step uncertainty is low, the non-autoregressive FM is the stronger and better-calibrated forecaster and AFM tends to be over-confident at long range. These results reinforce our central, measured claim: the autoregressive factorization is most beneficial for stochastic, multi-modal dynamics and near-to-mid horizons, while offering little advantage on smooth, near-deterministic decay where a global non-autoregressive prior suffices.}
+\begin{table*}[t]\centering
+\resizebox{\textwidth}{!}{\input{figures/appendix/table_multiseed.tex}}
+\caption{\oldrev{AFM-vs-FM comparison on the two real-world degradation benchmarks (mean$\pm$std). ``CRPS-Sum'' is the CRPS of the channel-summed forecast, an aggregate multivariate score; ``corr-dist'' is the Frobenius distance between the forecast and ground-truth cross-channel correlation matrices (lower is better for both). Per-horizon calibration/CRPS diagnostics, the cross-sensor correlation maps, and example probabilistic forecasts are provided in \ref{app:degradation}.}}
+\label{tab:realworld_degradation}
+\end{table*}
+
+\section{Discussion}
+In this work, we introduced AFM, a probabilistic forecasting model that combines autoregressive modeling with flow matching to generate accurate and well-calibrated predictions for multivariate timeseries data. By factorizing the forecasting problem into a sequence of conditional distributions, AFM effectively balances the sequential dependencies in temporal data with the expressiveness of flow-based generative modeling.
+Our empirical results across simulated dynamical systems and real-world datasets demonstrate that AFM achieves competitive performance against state-of-the-art baselines in challenging forecasting benchmarks. \oldrev{The autoregressive decomposition leads to improved CRPS and NRMSE in most evaluated settings compared to the non-autoregressive FM baseline, suggesting better calibration of marginal predictive distributions.} Furthermore, AFM exhibits robust generalization to out-of-distribution scenarios, particularly in extrapolation tasks where it achieves 93--98\% error reduction compared to the non-autoregressive FM baseline on synthetic systems \oldrev{(e.g., Brusselator: NRMSE 0.023 vs 1.046). These improvements are observed on stochastic dynamical systems where the ground truth model is known; whether similar gains transfer to real-world settings where data is not generated by a low-order dynamical system remains an open question.}
+
+AFM has limitations that warrant discussion. First, the sequential nature of autoregressive sampling introduces computational overhead during inference compared to fully parallelizable non-autoregressive models. Our experiments show that AFM is ~4× slower than non-autoregressive flow matching approaches (180ms vs 45ms per forecast on real-world datasets), which may limit its applicability in real-time forecasting systems requiring latency below 50ms. However, AFM remains significantly faster than autoregressive diffusion baselines like TimeGrad (850ms) while achieving better predictive performance with smaller model sizes (0.85M vs 2.8M--4.1M parameters). \oldrev{A second limitation is calibration at long horizons: because AFM is trained on single-step conditionals with teacher forcing but rolls out on its own predictions at inference, accumulated error is not reflected in its predictive intervals, so the model can become over-confident far into the horizon (most visibly on smooth, near-deterministic signals such as battery capacity fade). Mitigating this exposure bias via multi-step or scheduled-sampling training is a promising direction for future work.}
+Non-autoregressive methods are preferable when: (1) real-time inference is critical with strict latency requirements ($<$50ms), (2) forecast horizons are very short (1--5 steps) where the benefits of autoregressive modeling are minimal, and (3) training data fully covers the target prediction horizon and extrapolation beyond the training distribution is not required. In contrast, AFM excels in applications where accuracy and well-calibrated uncertainty estimates are prioritized over inference speed, such as climate modeling, demand planning, and scientific forecasting tasks that involve extrapolation. 
+Additionally, our current implementation applies flow matching directly in the data space, which may be suboptimal for high-dimensional partially observed data. 
+
+\oldrev{Overall, AFM demonstrates the potential of autoregressive factorization within the flow matching framework for probabilistic timeseries forecasting, achieving competitive accuracy with a compact model. Future work could explore latent-space formulations, extension to irregularly sampled data, adaptive window sizes, and broader applications in scientific modeling and decision-making under uncertainty.}
+
+
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{citations}
+
+\clearpage
+\appendix
+
+\section{Standard FM baseline}\label{app:nafm}
+
+\paragraph{Problem Setting} 
+We consider the same forecasting setup as in Section~\ref{sec:AFM} where given past observations $\mathbf{Y}_l$ and covariates $\mathbf{C}$, our goal remains to model the conditional distribution $p(\mathbf{Y}_f \mid \mathbf{Y}_l, \mathbf{C})$. However, unlike the autoregressive factorization, we directly model the joint distribution of the entire future trajectory $\mathbf{Y}_f \in \mathbb{R}^{f \times n}$ without temporal factorization:
+\begin{equation}
+    p(\mathbf{Y}_f \mid \mathbf{Y}_l, \mathbf{C}) = p(\mathbf{y}_{\tau+1}, \ldots, \mathbf{y}_{\tau+f} \mid \mathbf{Y}_l, \mathbf{C}) \,.
+\end{equation}
+This formulation preserves temporal correlations across all future time steps but requires learning a high-dimensional distribution.
+
+\paragraph{Training}
+We construct a probability path $(p^s(\mathbf{Y}_f))^{0\leq s \leq 1}$ that transports samples from a prior distribution $p^0(\mathbf{Y}_f) = \mathcal{N}(0, \mathbf{\Sigma})$ to the target distribution $p^1(\mathbf{Y}_f) \approx p(\mathbf{Y}_f\mid\mathbf{Y}_l,\mathbf{C})$, where $\mathbf{\Sigma}$ is a block-diagonal covariance matrix. The prior can be interpreted as independent Brownian motion processes per dimension, where Brownian motion is defined as a stochastic process $W \colon [\tau+1,\tau+f] \to \mathbb{R}^n$.
+
+We define the conditional probability path using a linear interpolation bridge with Brownian noise:
+\begin{equation}
+    p^s(\mathbf{Y}_f \mid \mathbf{z}) = \mathcal{N}\left(\mathbf{m}_s, \sigma^2 s(1-s)\mathbf{\Sigma}\right)
+\end{equation}
+where $\mathbf{m}_s = (1-s)\mathbf{Y}_f^0 + s\mathbf{Y}_f^1$ and $\mathbf{z} = (\mathbf{Y}_f^0, \mathbf{Y}_f^1)$ with $\mathbf{Y}_f^0 \sim p^0$ and $\mathbf{Y}_f^1 \sim p^1$. The corresponding conditional velocity field becomes:
+\begin{equation}
+    \mu(\mathbf{Y}_f, s\mid\mathbf{z}) = \mathbf{Y}_f^1 - \mathbf{Y}_f^0 + \frac{\sigma^2(1-2s)}{2}\mathbf{\Sigma}^{-1}(\mathbf{Y}_f - \mathbf{m}_s)
+\end{equation}
+When $\sigma^2 \to 0$, this reduces to the straight path velocity $\mu(\mathbf{Y}_f,s\mid\mathbf{z}) = \mathbf{Y}_f^1 - \mathbf{Y}_f^0$.
+We learn a neural velocity field $\nu_\theta$ that operates on the entire future trajectory. The context encoding remains similar to Eq.~\eqref{eq:seq_model}:
+\begin{equation}
+    \mathbf{h} = \zeta_\phi(\mathbf{Y}_l, \mathbf{C}_{\tau-l:\tau+f})
+\end{equation}
+where $\zeta_\phi$ now processes both past and future covariates. The training objective becomes:
+\begin{equation}
+    \mathcal{L}(\theta, \phi) = \mathbb{E} \left\| \mu(\mathbf{Y}_f^s, s\mid\mathbf{z}) - \nu_\theta(\mathbf{Y}_f^s, \mathbf{h}, \mathbf{C}_{\tau+1:\tau+f}, s) \right\|^2
+\end{equation}
+where the expectation is taken over $\mathbf{z} \sim \pi_{0,1}$, $s \sim \mathcal{U}(0,1)$ and $\mathbf{Y}_f^s \sim p^s(\mathbf{Y}_f\mid\mathbf{z})$. The vector field $\nu_\theta$ is implemented as a sequential neural network (e.g., Transformer or RNN) that processes the entire trajectory.
+Sampling requires solving the trajectory-level ODE:
+\begin{equation}
+    \dv{\psi(\mathbf{Y}_f,s)}{s} = \nu_\theta(\psi(\mathbf{Y}_f,s), \mathbf{h}, \mathbf{C}_{\tau+1:\tau+f}, s)
+\end{equation}
+using numerical solvers subject to $\psi(\mathbf{Y}_f,0) \sim p^0$. This produces joint samples from $p(\mathbf{Y}_f\mid\mathbf{Y}_l,\mathbf{C})$ without autoregressive decomposition.
+
+Algorithms~\ref{tab:fmtrain} and \ref{tab:fminfer} describe training and inference procedures for the standard FM model, respectively.
+
+\begin{algorithm}[t]
+\caption{FM training.}
+\begin{small}
+\begin{algorithmic}[1]
+\Require Dataset $\mathcal{D}$, networks $\nu_\theta$, $\zeta_\phi$
+\While{not converged}
+    \State Sample $\mathbf{Y}_f^0 \sim \mathcal{N}(0,\mathbf{\Sigma})$ \State Sample $(\mathbf{Y}_f^1,\mathbf{Y}_l,\mathbf{C}) \sim \mathcal{D}$
+    \State Set $\mathbf{h} = \zeta_\phi(\mathbf{Y}_l, \mathbf{C}_{\tau-l:\tau+f})$
+    \State Sample $s\sim\mathcal{U}(0,1)$
+    \State Sample $\mathbf{Y}_f^s \sim \mathcal{N}\left(\mathbf{m}_s, \sigma^2 s(1-s)\mathbf{\Sigma}\right)$ with $\mathbf{m}_s = (1-s)\mathbf{Y}_f^0 + s\mathbf{Y}_f^1$
+    \State Set target $\mu(\mathbf{Y}_f^s,s\mid\mathbf{z})$
+    \State Set $\mathcal{L} = \|\mu(\cdot) - \nu_\theta(\mathbf{Y}_f^s, \mathbf{h}, \mathbf{C}_{\tau+1:\tau+f}, s)\|^2_{\mathbf{\Sigma}^{-1}}$
+    \State Update $\theta,\phi$ to minimize the loss
+\EndWhile
+\end{algorithmic}
+\end{small}
+\label{tab:fmtrain}
+\end{algorithm}
+
+\begin{algorithm}[t]
+\caption{FM inference.}
+\begin{small}
+\begin{algorithmic}[1]
+\Require $\mathbf{Y}_l$, $\mathbf{C}$, networks $\nu_\theta$, $\zeta_\phi$
+\State Encode context $\mathbf{h} = \zeta_\phi(\mathbf{Y}_l, \mathbf{C})$
+\State Sample initial trajectory $\mathbf{Y}_f^0 \sim \mathcal{N}(0,\mathbf{\Sigma})$
+\State Solve $\dv{\psi(\mathbf{Y}_f,s)}{s} = \nu_\theta(\psi(\mathbf{Y}_f,s), \mathbf{h}, \mathbf{C}_{\tau+1:\tau+f}, s)$
+\State Return $\psi(\mathbf{Y}_f,1)$
+\end{algorithmic}
+\end{small}
+\label{tab:fminfer}
+\end{algorithm}
+
+
+\paragraph{Implementation Details}
+We used this baseline to conduct experiments on the task of forecasting multiple dynamical systems. For this setup we set $\nu_\theta$ as a 4-layer bi-directional LSTM with 128 hidden units. We kept the same training parameters as in Section~\ref{subsec:dynamical_systems}. Training until convergence took $\sim$2 minutes on a single A100-SXM4-40GB NVIDIA GPU. 
+
+\paragraph{Key Differences from Autoregressive Variant} The non-autoregressive approach differs fundamentally from its autoregressive counterpart introduced in AFM. First, while the autoregressive method factorizes the joint distribution via a Markovian decomposition across time steps, the non-autoregressive baseline directly models the full future trajectory $\mathbf{Y}_f$
+as a single high-dimensional random variable. This preserves cross-temporal dependencies at the expense of learning a more complex distribution over $\mathbb{R}^{n \times f}$. 
+Second, computational characteristics diverge significantly: the non-autoregressive version processes entire trajectories through sequential neural networks for the velocity fields enabling parallel generation of all future timepoints at the cost of higher memory requirements. Finally, their uncertainty propagation mechanisms contrast sharply: the autoregressive approach explicitly models how prediction errors accumulate through the chain of conditional distributions, while the non-autoregressive method captures joint uncertainty over all timesteps through trajectory-level sampling but lacks explicit mechanisms to model error accumulation dynamics. These differences create complementary trade-offs as the autoregressive variant offers interpretable uncertainty quantification and efficient window-based computation but assumes limited Markovian dependencies. In contrast, the non-autoregressive baseline preserves full temporal correlations at higher computational cost with less explicit uncertainty dynamics.
+
+
+
+
+
+
+
+\section{\oldrev{Degradation benchmarks}}\label{app:degradation}
+
+{
+This appendix provides the supporting material for the two real-world physical-degradation benchmarks introduced in the main text (Section~\ref{subsec:realworld}): the NASA Li-ion battery (per-cycle discharge-capacity fade, leave-one-battery-out; $66$-cycle context and horizon) and the C-MAPSS turbofan ($14$-sensor multivariate forecasting; $20$-cycle context, $108$-cycle horizon). The aggregate three-seed AFM-vs-FM comparison is reported in the main text (Table~\ref{tab:realworld_degradation}); here we give the per-horizon calibration and CRPS curves, the cross-sensor correlation structure, example probabilistic forecasts, and the supporting accuracy and diagnostic tables.
+}
+
+\begin{table*}[t]\centering
+\input{figures/appendix/table_battery_published.tex}
+\caption{\oldrev{Battery capacity-fade forecasting accuracy. AFM/FM are our three-seed means; the normalized-SOH column divides the capacity RMSE by the $\sim$$2$~Ah rated capacity. The matching-protocol published baseline is the Gaussian-process forecaster of \citet{richardson2017gaussian}.}}
+\label{tab:app_battery}
+\end{table*}
+
+\begin{table*}[t]\centering
+\input{figures/appendix/table_cmapss_diagnostics.tex}
+\caption{\oldrev{C-MAPSS turbofan calibration and dependence diagnostics (three-seed mean$\pm$std).}}
+\label{tab:app_cmapss_diag}
+\end{table*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\textwidth]{figures/appendix/cmapss_FD001_forecast_fan.pdf}
+\caption{\oldrev{C-MAPSS turbofan: probabilistic sensor-trajectory forecast for one held-out engine, AFM (left) vs.\ FM (right). Shaded context window, ensemble median, $50\%$/$90\%$ prediction intervals, and ground truth.}}
+\label{fig:app_cmapss_fan}
+\end{figure*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=0.49\textwidth]{figures/appendix/cmapss_FD001_calibration_vs_horizon.pdf}\hfill
+\includegraphics[width=0.49\textwidth]{figures/appendix/cmapss_FD001_crps_vs_horizon.pdf}
+\caption{\oldrev{C-MAPSS turbofan, three-seed mean$\pm$band. Left: $90\%$ prediction-interval coverage vs.\ forecast horizon (nominal $0.9$ dashed). Right: horizon-resolved CRPS. AFM is better calibrated and lower-CRPS over the near-to-mid horizon; FM overtakes at long range as AFM's rollout accumulates error.} \rev{The sharp decrease in FM CRPS over the last few forecast steps does not reflect improved forecasts. FM, trained on 40-step windows, generates the 108-step horizon in one pass, and its predictive spread grows sharply over the final steps (at step 108 the $90\%$ interval is $3.6\times$ its average width over steps 1--100, and coverage rises to $0.985$), while its point error does not decrease. The observations therefore fall closer to the centre of an over-dispersed predictive distribution, which the sample-rank CRPS of Section~\ref{subsec:dynamical_systems} does not penalise. Excluding the last four steps changes FM's aggregate CRPS in Table~\ref{tab:realworld_degradation} by $0.001$.}}
+\label{fig:app_cmapss_diag}
+\end{figure*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\textwidth]{figures/appendix/cmapss_FD001_correlation.pdf}
+\caption{\oldrev{C-MAPSS turbofan cross-sensor correlation matrices: ground truth vs.\ AFM and FM forecast samples (a smaller Frobenius distance to the ground-truth matrix indicates better-captured multivariate dependence).}}
+\label{fig:app_cmapss_corr}
+\end{figure*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=\textwidth]{figures/appendix/battery_B0007_forecast_fan.pdf}
+\caption{\oldrev{NASA Li-ion battery (held-out cell): capacity-fade forecast, AFM (left) vs.\ FM (right). FM tracks the smooth decay more accurately and with better-calibrated intervals; AFM drifts low and is over-confident at long range.}}
+\label{fig:app_battery_fan}
+\end{figure*}
+
+\begin{figure*}[t]\centering
+\includegraphics[width=0.49\textwidth]{figures/appendix/battery_B0007_calibration_vs_horizon.pdf}\hfill
+\includegraphics[width=0.49\textwidth]{figures/appendix/battery_B0007_crps_vs_horizon.pdf}
+\caption{\oldrev{NASA Li-ion battery, three-seed mean$\pm$band: $90\%$ prediction-interval coverage (left) and horizon-resolved CRPS (right). Both methods under-cover on this smooth signal, but AFM is markedly more over-confident.}}
+\label{fig:app_battery_diag}
+\end{figure*}
+
+\end{document}
