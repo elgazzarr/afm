@@ -4,7 +4,15 @@ from jax import jit
 @jit
 def compute_crps(predictions, groundtruth):
     """
-    JAX implementation of CRPS computation.
+    Sample-rank CRPS: mean over sorted samples x_(i) of (i/S - 1{x_(i) >= y})^2.
+
+    This evaluates the CRPS integrand at the S samples and averages with equal weights,
+    i.e. it integrates with respect to the predictive distribution rather than over y.
+    It depends only on the rank of y among the samples (about (p^3 + (1-p)^3)/3 for
+    PIT value p), ranges from 1/12 (y at the median) to 1/3 (y outside the samples),
+    and does not penalise over-dispersed ensembles. It is the score reported for the
+    synthetic systems and degradation benchmarks in the paper (Section 4.1); it is not
+    the scale-dependent CRPS computed by GluonTS for the Table 4 datasets.
 
     Args:
         predictions: Array of shape (S,B,T,C)

@@ -77,6 +77,21 @@ AFM includes scripts to evaluate on two real-world datasets for degradation and 
 
 Raw data should be placed in the `data/` directory. Data URLs and acquisition instructions are documented in `src/afm/datasets/download.py`. Evaluation is CPU-only (no GluonTS or GPU required).
 
+## Statistical baselines for the GluonTS benchmarks (Table 4)
+
+`baselines/r2_statistical_baselines.py` scores the `statsforecast` baselines (Naive on Exchange; MSTL-ETS and DHR-ARIMA with periods 24 and 168 on Electricity, Solar and Traffic) on the same GluonTS test windows and `MultivariateEvaluator` (quantiles 0.05, ..., 0.95) as AFM. It uses a separate environment:
+
+```bash
+uv venv baselines/.venv --python 3.12
+uv pip install --python baselines/.venv/bin/python gluonts==0.17.0 statsforecast==2.1.1 utilsforecast==0.2.16
+baselines/.venv/bin/python baselines/r2_statistical_baselines.py validate   # reproduces the quoted SN/AutoETS/AutoARIMA values
+baselines/.venv/bin/python baselines/r2_statistical_baselines.py naive      # Naive on Exchange
+baselines/.venv/bin/python baselines/r2_statistical_baselines.py run --model mstl --dataset solar_nips
+bash baselines/run_r2_dhr.sh                                                # DHR-ARIMA: choose (K1, K2) by AICc, then run
+```
+
+Results are written to `results/r2/`. `examples/r2_b4_diagnostic.py` reproduces the analysis of the FM horizon-wise score on C-MAPSS (Fig. B.4) from the saved run artefacts.
+
 ## CLI for Paper Experiments
 
 The package includes a CLI for reproducing the experiments from the paper:
