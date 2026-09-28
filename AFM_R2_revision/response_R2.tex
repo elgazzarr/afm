@@ -104,7 +104,7 @@ We agree: the AutoARIMA, AutoETS and seasonal naive implementations we used each
   \item \textbf{MSTL-ETS}: MSTL decomposition \citep{bandara2025mstl} with AutoETS on the seasonally adjusted series;
   \item \textbf{DHR-ARIMA}: dynamic harmonic regression, i.e.\ ARIMA errors with Fourier terms for both periods, as the AE suggested in the first round; the numbers of Fourier pairs were selected per dataset by AICc, giving $(K_1, K_2) = (6, 4)$, $(6, 2)$ and $(6, 6)$ for Electricity, Solar and Traffic.
 \end{itemize}
-The implementation, seasonal periods, quantile construction and clipping to each dataset's domain are detailed in Section~4.2. The new results are:
+The implementation, seasonal periods, quantile construction and clipping to each dataset's domain are detailed in Section~4.2. The new results (CRPS, lower is better; best in bold) are:
 
 \begin{center}
 \begin{tabular}{lccc}
@@ -113,12 +113,11 @@ Method & Electricity & Solar & Traffic \\
 \hline
 MSTL-ETS  & 0.058 & 0.520 & 0.248 \\
 DHR-ARIMA & 0.066 & 0.460 & 0.202 \\
-Best single-season classical & 0.055 (AutoETS) & 0.512 (SN) & 0.221 (SN) \\
-AFM       & 0.042 & 0.284 & 0.089 \\
+AFM       & \textbf{0.042} & \textbf{0.284} & \textbf{0.089} \\
 \hline
 \end{tabular}
 \end{center}
-The multi-seasonal baselines improve on the single-season ones in most but not all cases. DHR-ARIMA is the best statistical method on Solar and Traffic, whereas on Electricity the single-season AutoETS remains best, narrowly ahead of MSTL-ETS. MSTL-ETS improves on the single-season AutoARIMA and AutoETS on Solar and Traffic, but not on the seasonal naive forecast. All statistical baselines remain well behind the deep probabilistic models, so the conclusions of Section~4.2 are unchanged.
+For comparison, the best single-season classical baselines attain 0.055 on Electricity (AutoETS), 0.512 on Solar and 0.221 on Traffic (both seasonal naive). The multi-seasonal baselines improve on the single-season ones in most but not all cases. DHR-ARIMA is the best statistical method on Solar and Traffic, whereas on Electricity the single-season AutoETS remains best, narrowly ahead of MSTL-ETS. MSTL-ETS improves on the single-season AutoARIMA and AutoETS on Solar and Traffic, but not on the seasonal naive forecast. All statistical baselines remain well behind the deep probabilistic models, so the conclusions of Section~4.2 are unchanged.
 }
 
 \reviewertext{%
@@ -160,7 +159,7 @@ We recognise that our previous wording caused the confusion: Section~4.1 describ
 }
 
 \authorresponse{%
-Thank you. In correcting this, we re-checked every quoted value in Table~4 against its source and found five transcription errors, which we have corrected: AutoARIMA on Exchange (0.008 in the source, not 0.013), seasonal naive on Electricity (0.069), AutoETS on Electricity (0.055), and SSSD on Solar (0.384) and Traffic (0.097); several standard errors were also corrected. We now also state that the TSFlow results are those reported in the first arXiv version of \citet{Kerrigan2024Flow}. All corrections are marked in blue. With these corrections and the new naive row (AE comment~1), the naive forecast (0.007) is best on Exchange and shown in bold, AutoARIMA and AutoETS (both 0.008) are second best and underlined, and AFM and TSFlow (0.009) follow. None of the corrections changes the best or second-best method on the other four datasets. We also corrected the corresponding text: AFM achieves the best CRPS on two of the five datasets (Electricity and Solar), and on Exchange it does not improve on the naive forecast.
+Thank you, corrected. While revising Table~4, we also re-checked all quoted baseline values against their sources and corrected a few transcription errors (marked in blue); none of these corrections changes the conclusions. With the naive forecast added for Exchange (AE comment~1), the best score on Exchange is now the naive forecast (0.007, in bold), followed by AutoETS and AutoARIMA (both 0.008, underlined). The text has been updated accordingly: AFM achieves the best CRPS on two of the five datasets (Electricity and Solar).
 }
 
 \reviewertext{%
