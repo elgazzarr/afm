@@ -167,13 +167,7 @@ Thank you, corrected. While revising Table~4, we also re-checked all quoted base
 }
 
 \authorresponse{%
-Thank you for spotting this. The drop does not reflect better forecasts; it results from the interaction of two factors.
-
-First, the non-autoregressive FM baseline, which is trained on 40-step windows, generates the full 108-step C-MAPSS horizon in a single pass, and its predictive spread grows sharply over the final steps. At the last step its $90\%$ prediction interval is $3.6$ times its average width over steps 1--100, and its $90\%$ coverage rises from $0.84$ on average to $0.985$, while its point error does not decrease (the mean absolute error of the predictive mean is $0.96$ at the last step, against $0.57$ on average).
-
-Second, for the degradation benchmarks and the synthetic systems, the CRPS is computed from the rank of the observation among the forecast samples. This score is lowest when the observation falls at the centre of the predictive distribution and does not penalise over-dispersion. As FM's samples spread out, the observations move towards their centre ($68\%$ of observations fall within the central $50\%$ of the samples at the last step, against $43\%$ on average), which lowers the score.
-
-We have now described this estimator and its properties explicitly in Section~4.1 and added the explanation to the caption of Figure~B.4. We also checked that the drop is not caused by padding or misalignment: every forecast step averages over the same 20 engines and 14 sensors, with no padding, and forecasts and targets are aligned. Excluding the last four steps changes FM's aggregate CRPS in Table~6 by $0.001$ (from $0.179$ to $0.180$), so the comparison in Table~6 is unaffected. (Interval widths, point errors and sample positions are from the stored samples of the first seed; coverage and CRPS are three-seed means.)
+Thank you for spotting this. The drop does not reflect better forecasts. The non-autoregressive FM baseline, trained on 40-step windows, generates the full 108-step horizon in a single pass, and its predictive spread grows sharply over the final steps: at the last step its $90\%$ interval is $3.6$ times its average width and its coverage rises to $0.985$, while its point error does not decrease. Because our sample-based CRPS depends on the position of the observation among the forecast samples and does not penalise over-dispersion, this widening lowers the score. We have added this explanation to the caption of Figure~B.4 and described the estimator in Section~4.1. Excluding the last four steps changes FM's aggregate CRPS in Table~6 by only $0.001$, so the comparison is unaffected.
 }
 
 \bibliographystyle{plainnat}
