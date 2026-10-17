@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Tuple
 import jax
 import jax.numpy as jnp
 import jax.random as jrandom
+import flax.nnx as nnx
 import numpy as np
 from pathlib import Path
 import json
@@ -12,7 +13,11 @@ from .base import BaseExperiment
 from ..config import Config
 from ..systems.systems import create_system
 from ..models import AutoregressiveFlowMatching, FlowMatching
-from ..training.data import prepare_data
+from ..training.data import (
+    prepare_trajectories,
+    create_infinite_dataloaders,
+    create_evaluation_dataloader,
+)
 from ..training.trainers import AFMTrainer, FMTrainer
 from ..evaluation.evaluator import ModelEvaluator
 
@@ -50,9 +55,17 @@ class MultiSystemExperiment(BaseExperiment):
         system_config.system_stochastic = stochastic
         system_config._compute_derived_fields()
         
-        # Prepare data
-        data = prepare_data(system, system_config, self.key)
-        (afm_train_data, afm_test_data), (fm_train_data, fm_test_data) = data
+        # Prepare data: infinite training loaders + deterministic evaluation loader
+        train_trajectories, test_trajectories, covariates = prepare_trajectories(
+            system, system_config, self.key
+        )
+        (afm_train_data, afm_test_data), (fm_train_data, fm_test_data) = \
+            create_infinite_dataloaders(
+                train_trajectories, test_trajectories, covariates, system_config
+            )
+        eval_loader = create_evaluation_dataloader(
+            test_trajectories, covariates, system_config
+        )
         
         # Create models
         self.key, afm_key, fm_key = jrandom.split(self.key, 3)
@@ -66,7 +79,7 @@ class MultiSystemExperiment(BaseExperiment):
             hidden_blocks=system_config.model_hidden_blocks,
             n_rnn_layers=system_config.model_n_rnn_layers,
             rnn_hidden=system_config.model_rnn_hidden,
-            rngs=jax.nn.initializers.Rngs(afm_key)
+            rngs=nnx.Rngs(afm_key)
         )
         
         fm_model = FlowMatching(
@@ -77,7 +90,7 @@ class MultiSystemExperiment(BaseExperiment):
             dim_hidden=system_config.model_hidden_dim,
             hidden_blocks=system_config.model_hidden_blocks,
             n_rnn_layers=system_config.model_n_rnn_layers,
-            rngs=jax.nn.initializers.Rngs(fm_key)
+            rngs=nnx.Rngs(fm_key)
         )
         
         # Train models
@@ -101,7 +114,7 @@ class MultiSystemExperiment(BaseExperiment):
         
         for model_name, model in [('AFM', afm_model), ('FM', fm_model)]:
             print(f"Evaluating {model_name}...")
-            metrics = evaluator.evaluate_model(model, test_data, self.key)
+            metrics = evaluator.evaluate_model(model, eval_loader, self.key)
             results[model_name] = metrics
         
         # Add system info

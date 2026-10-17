@@ -13,7 +13,11 @@ import matplotlib.pyplot as plt
 from .base import BaseExperiment
 from ..config import Config
 from ..models import AutoregressiveFlowMatching, FlowMatching
-from ..training.data import prepare_data
+from ..training.data import (
+    prepare_trajectories,
+    create_infinite_dataloaders,
+    create_evaluation_dataloader,
+)
 from ..training.trainers import AFMTrainer, FMTrainer
 from ..evaluation.evaluator import ModelEvaluator
 
@@ -75,9 +79,17 @@ class ParameterSweepExperiment(BaseExperiment):
         """
         print(f"Running sweep point with config: {self.get_config_identifier(config)}")
         
-        # Prepare data
-        data = prepare_data(self.system, config, self.key)
-        (afm_train_data, afm_test_data), (fm_train_data, fm_test_data) = data
+        # Prepare data: infinite training loaders + deterministic evaluation loader
+        train_trajectories, test_trajectories, covariates = prepare_trajectories(
+            self.system, config, self.key
+        )
+        (afm_train_data, afm_test_data), (fm_train_data, fm_test_data) = \
+            create_infinite_dataloaders(
+                train_trajectories, test_trajectories, covariates, config
+            )
+        eval_loader = create_evaluation_dataloader(
+            test_trajectories, covariates, config
+        )
         
         # Create models
         self.key, afm_key, fm_key = jrandom.split(self.key, 3)
@@ -119,9 +131,9 @@ class ParameterSweepExperiment(BaseExperiment):
         results = {}
         
         for model_name, model in models.items():
-            metrics = evaluator.evaluate_model(model, test_data, self.key)
+            metrics = evaluator.evaluate_model(model, eval_loader, self.key)
             results[model_name] = metrics
-            
+
         # Add configuration info to results
         results['config'] = self.get_config_dict(config)
         
@@ -183,8 +195,23 @@ class HistoryLengthSweepExperiment(ParameterSweepExperiment):
         self.optimal_histories = {'AFM': None, 'FM': None}  # Track optimal history lengths
     
     def prepare_data(self) -> Tuple[Any, Any]:
-        """Prepare training and test data."""
-        return prepare_data(self.system, self.config, self.key)
+        """Prepare training and evaluation data.
+
+        Returns (train_data, eval_loader): train_data is
+        ((afm_train, afm_test), (fm_train, fm_test)); eval_loader is the
+        deterministic evaluation loader yielding (history, covariates,
+        prediction, extrapolation) windows.
+        """
+        train_trajectories, test_trajectories, covariates = prepare_trajectories(
+            self.system, self.config, self.key
+        )
+        train_data = create_infinite_dataloaders(
+            train_trajectories, test_trajectories, covariates, self.config
+        )
+        eval_loader = create_evaluation_dataloader(
+            test_trajectories, covariates, self.config
+        )
+        return train_data, eval_loader
     
     def create_models(self) -> Dict[str, Any]:
         """Create models for the experiment."""
@@ -217,8 +244,9 @@ class HistoryLengthSweepExperiment(ParameterSweepExperiment):
     
     def train_models(self, models: Dict[str, Any], train_data: Any, test_data: Any) -> None:
         """Train all models."""
-        # Unpack infinite dataloader format
-        (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = train_data, test_data
+        # train_data holds ((afm_train, afm_test), (fm_train, fm_test));
+        # the evaluation loader is passed separately as test_data.
+        (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = train_data
 
         afm_trainer = AFMTrainer(models['AFM'], learning_rate=self.config.training_learning_rate)
         fm_trainer = FMTrainer(models['FM'], learning_rate=self.config.training_learning_rate)
@@ -639,8 +667,23 @@ class NFEEfficiencyExperiment(ParameterSweepExperiment):
     """Experiment that sweeps over NFE values to study efficiency."""
     
     def prepare_data(self) -> Tuple[Any, Any]:
-        """Prepare training and test data."""
-        return prepare_data(self.system, self.config, self.key)
+        """Prepare training and evaluation data.
+
+        Returns (train_data, eval_loader): train_data is
+        ((afm_train, afm_test), (fm_train, fm_test)); eval_loader is the
+        deterministic evaluation loader yielding (history, covariates,
+        prediction, extrapolation) windows.
+        """
+        train_trajectories, test_trajectories, covariates = prepare_trajectories(
+            self.system, self.config, self.key
+        )
+        train_data = create_infinite_dataloaders(
+            train_trajectories, test_trajectories, covariates, self.config
+        )
+        eval_loader = create_evaluation_dataloader(
+            test_trajectories, covariates, self.config
+        )
+        return train_data, eval_loader
     
     def create_models(self) -> Dict[str, Any]:
         """Create models for the experiment."""
@@ -673,8 +716,9 @@ class NFEEfficiencyExperiment(ParameterSweepExperiment):
     
     def train_models(self, models: Dict[str, Any], train_data: Any, test_data: Any) -> None:
         """Train all models."""
-        # Unpack infinite dataloader format
-        (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = train_data, test_data
+        # train_data holds ((afm_train, afm_test), (fm_train, fm_test));
+        # the evaluation loader is passed separately as test_data.
+        (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = train_data
 
         afm_trainer = AFMTrainer(models['AFM'], learning_rate=self.config.training_learning_rate)
         fm_trainer = FMTrainer(models['FM'], learning_rate=self.config.training_learning_rate)

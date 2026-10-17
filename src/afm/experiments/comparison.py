@@ -10,7 +10,11 @@ from pathlib import Path
 from .base import BaseExperiment
 from ..config import Config
 from ..models import AutoregressiveFlowMatching, FlowMatching
-from ..training.data import prepare_data
+from ..training.data import (
+    prepare_trajectories,
+    create_infinite_dataloaders,
+    create_evaluation_dataloader,
+)
 from ..training.trainers import AFMTrainer, FMTrainer
 from ..evaluation.evaluator import ModelEvaluator
 from ..utils.visualization import plot_trajectories
@@ -25,8 +29,24 @@ class AFMvsFMComparison(BaseExperiment):
         self.evaluator = ModelEvaluator(config, config.flow_nfe)
 
     def prepare_data(self) -> Tuple[Any, Any]:
-        """Prepare training and test data loaders."""
-        return prepare_data(self.system, self.config, self.key)
+        """Prepare training and test data loaders.
+
+        Returns:
+            Tuple of (train_data, eval_loader) where train_data is
+            ((afm_train, afm_test), (fm_train, fm_test)) and eval_loader is
+            the deterministic evaluation loader yielding
+            (history, covariates, prediction, extrapolation) windows.
+        """
+        train_trajectories, test_trajectories, covariates = prepare_trajectories(
+            self.system, self.config, self.key
+        )
+        train_data = create_infinite_dataloaders(
+            train_trajectories, test_trajectories, covariates, self.config
+        )
+        eval_loader = create_evaluation_dataloader(
+            test_trajectories, covariates, self.config
+        )
+        return train_data, eval_loader
 
     def create_models(self) -> Dict[str, Any]:
         """Create AFM and FM models."""
@@ -69,8 +89,9 @@ class AFMvsFMComparison(BaseExperiment):
         test_data: Any
     ) -> None:
         """Train AFM and FM models."""
-        # Infinite dataloader returns ((afm_train, afm_test), (fm_train, fm_test))
-        (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = train_data, test_data
+        # train_data holds ((afm_train, afm_test), (fm_train, fm_test));
+        # the evaluation loader is passed separately as test_data.
+        (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = train_data
 
         # Train AFM model
         afm_trainer = AFMTrainer(

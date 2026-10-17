@@ -130,7 +130,9 @@ class BaseExperiment(ABC):
         custom_tags = wandb_config.get('tags', [])
         notes = wandb_config.get('notes', getattr(self.config, 'experiment_description', ''))
 
-        # Initialize wandb with enhanced organization
+        # Initialize wandb with enhanced organization.
+        # Defaults to disabled mode so experiments run without a wandb
+        # account or login; set WANDB_MODE=online (or offline) to enable.
         wandb.init(
             project=self.config.experiment_wandb_project,
             group=custom_group,
@@ -139,7 +141,8 @@ class BaseExperiment(ABC):
             notes=notes,
             config=config_dict,
             # Allow multiple runs in same process for parameter sweeps
-            reinit=True
+            reinit=True,
+            mode=os.environ.get("WANDB_MODE", "disabled"),
         )
 
     def create_results_directory(self) -> Path:

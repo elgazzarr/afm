@@ -5,7 +5,11 @@ import jax.numpy as jnp
 import jax.random as jrandom
 from afm.config import Config
 from afm.systems.systems import create_system
-from afm.training.data import prepare_data_unified
+from afm.training.data import (
+    prepare_trajectories,
+    create_infinite_dataloaders,
+    create_evaluation_dataloader,
+)
 from afm.models.afm import AutoregressiveFlowMatching
 from afm.models.fm import FlowMatching
 from afm.training.trainers import AFMTrainer, FMTrainer
@@ -32,7 +36,6 @@ def test_infinite_dataloader():
         data_batch_size=16,
 
         # Infinite dataloader parameters
-        use_infinite_dataloader=True,
         context_length=40,
         afm_prediction_horizon=1,
         fm_prediction_horizon=25,
@@ -56,8 +59,10 @@ def test_infinite_dataloader():
     key = jrandom.PRNGKey(42)
 
     print("\nGenerating trajectory data...")
-    data = prepare_data_unified(system, config, key)
-    (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = data
+    train_trajectories, test_trajectories, covariates = prepare_trajectories(system, config, key)
+    time_grid = covariates  # keep a handle: 'covariates' is shadowed by batch unpacking below
+    (afm_train_loader, afm_test_loader), (fm_train_loader, fm_test_loader) = \
+        create_infinite_dataloaders(train_trajectories, test_trajectories, covariates, config)
 
     print(f"Created infinite dataloaders with {config.steps_per_epoch} steps per epoch")
 
@@ -96,6 +101,22 @@ def test_infinite_dataloader():
         fm_batch_count += 1
 
     print(f"✓ FM dataloader works correctly")
+
+    # Test the deterministic evaluation loader (4-tuple windows)
+    print("\nTesting evaluation dataloader...")
+    eval_loader = create_evaluation_dataloader(test_trajectories, time_grid, config)
+    n_test = test_trajectories.shape[0]
+    for _ in range(2):  # must be re-iterable: several models evaluated in sequence
+        batches = list(eval_loader)
+        assert len(batches) == 1  # 12 test trajectories < batch_size 16
+        history, cov, pred, extrap = batches[0]
+        window = config.context_length + config.fm_prediction_horizon + config.extrapolation_size
+        assert history.shape == (n_test, config.context_length, 3)
+        assert cov.shape == (n_test, config.context_length, 1)
+        assert pred.shape == (n_test, config.fm_prediction_horizon, 3)
+        assert extrap.shape == (n_test, config.extrapolation_size, 3)
+        assert config.context_length + config.fm_prediction_horizon + config.extrapolation_size == window
+    print(f"✓ Evaluation dataloader works correctly (re-iterable, 4-tuple windows)")
 
     # Test model training with new loss function
     print("\nTesting AFM training with new parallel loss...")

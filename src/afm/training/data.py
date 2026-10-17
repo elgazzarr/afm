@@ -16,6 +16,73 @@ from .dataloader import (
 )
 
 
+def create_evaluation_dataloader(
+    test_trajectories: jnp.ndarray,
+    covariates: jnp.ndarray,
+    config: Config,
+    batch_size: int = None
+) -> Any:
+    """Create a deterministic evaluation loader for held-out test trajectories.
+
+    Unlike the infinite training loaders (which yield randomly sampled
+    (context, next-step) windows as 3-tuples), this loader yields fixed
+    (history, covariates, prediction, extrapolation) 4-tuple windows expected
+    by ``ModelEvaluator``: for each test trajectory, the first
+    ``context_length`` steps form the history, the next
+    ``fm_prediction_horizon`` steps the prediction target, and the remaining
+    ``extrapolation_size`` steps the extrapolation target.
+
+    Args:
+        test_trajectories: Held-out trajectories (n_test, n_timepoints, state_dim)
+        covariates: Time grid (n_timepoints,)
+        config: Model configuration
+        batch_size: Batch size (defaults to ``config.data_batch_size``)
+
+    Returns:
+        Iterator yielding (history, covariates, prediction, extrapolation)
+        batches of shapes (B, context, dim), (B, context, 1),
+        (B, fm_prediction_horizon, dim), (B, extrapolation_size, dim).
+    """
+    if batch_size is None:
+        batch_size = config.data_batch_size
+
+    context_length = config.context_length
+    pred_length = config.fm_prediction_horizon
+    extrap_length = config.extrapolation_size
+    window_length = context_length + pred_length + extrap_length
+
+    n_traj, n_timepoints = test_trajectories.shape[0], test_trajectories.shape[1]
+    if n_timepoints < window_length:
+        raise ValueError(
+            f"Trajectories have {n_timepoints} timepoints, but evaluation needs "
+            f"context ({context_length}) + prediction ({pred_length}) + "
+            f"extrapolation ({extrap_length}) = {window_length}"
+        )
+
+    # Expand the shared time grid to (n_traj, n_timepoints, 1)
+    traj_covariates = jnp.repeat(covariates[None, :, None], n_traj, axis=0)
+
+    class _EvalLoader:
+        """Re-iterable evaluation loader (a fresh pass over the test set on
+        every ``iter()`` call), so several models can be evaluated on the
+        same windows in sequence."""
+
+        def __iter__(self):
+            def batches():
+                for start in range(0, n_traj, batch_size):
+                    traj = test_trajectories[start:start + batch_size]
+                    cov = traj_covariates[start:start + batch_size]
+                    yield (
+                        traj[:, :context_length],
+                        cov[:, :context_length],
+                        traj[:, context_length:context_length + pred_length],
+                        traj[:, context_length + pred_length:window_length],
+                    )
+            return batches()
+
+    return _EvalLoader()
+
+
 def prepare_trajectories(
     system: DynamicalSystem,
     config: Config,
