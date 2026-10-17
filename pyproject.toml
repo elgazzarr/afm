@@ -45,11 +45,18 @@ dependencies = [
     "requests>=2.28",
 ]
 
+[project.optional-dependencies]
+# GluonTS benchmark pipeline (src/afm/gluonts_pipeline/, Table 4 of the paper).
+# Pinned to the same version used by the statistical-baseline harness in baselines/.
+gluonts = [
+    "gluonts==0.17.0",
+]
+
 [project.scripts]
 afm = "afm.cli:main"
 
 [project.urls]
-Repository = "https://github.com/aelgazzar/afm"
+Repository = "https://github.com/elgazzarr/afm"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/afm"]
