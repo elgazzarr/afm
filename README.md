@@ -16,7 +16,12 @@ AFM is a JAX library for probabilistic multivariate time series forecasting. Giv
 
 ```bash
 pip install -e .
+# with the GluonTS benchmark pipeline (Table 4 of the paper):
+pip install -e ".[gluonts]"
 ```
+
+Weights & Biases logging is optional and disabled by default; set
+`WANDB_MODE=online` to enable it.
 
 ## Quick Start
 
@@ -74,8 +79,26 @@ AFM includes scripts to evaluate on two real-world datasets for degradation and 
 
 - `examples/realworld_battery.py`: Battery capacity fade forecasting on NASA battery cycles.
 - `examples/realworld_cmapss.py`: Engine remaining useful life (RUL) prediction on NASA C-MAPSS data.
+- `examples/realworld_multiseed.py`: the paper's Table 6 protocol (3 seeds, AFM vs FM, resumable from saved checkpoints in `results/realworld/models/`).
 
 Raw data should be placed in the `data/` directory. Data URLs and acquisition instructions are documented in `src/afm/datasets/download.py`. Evaluation is CPU-only (no GluonTS or GPU required).
+
+## GluonTS benchmarks (Table 4 of the paper)
+
+The AFM runs on the GluonTS benchmarks (`electricity_nips`, `solar_nips`,
+`traffic_nips`, `exchange_rate_nips`, `wiki-rolling_nips`) use the pipeline
+in `src/afm/gluonts_pipeline/` — a faithful port of the exact code used for
+the paper (datasets auto-download on first run; full-scale training needs a
+GPU, ~40–100 min per dataset on an A100):
+
+```bash
+python -m afm.gluonts_pipeline.run --dataset_name exchange_rate_nips \
+    --training_steps 1000 --context_ratio 2.0
+```
+
+Note: the per-dataset run configurations of the published Table 4 values
+were not archived, so regenerated values will differ from the published
+ones — see `REPRODUCIBILITY.md` §11.
 
 ## Statistical baselines for the GluonTS benchmarks (Table 4)
 
@@ -104,6 +127,13 @@ afm validate afm_vs_fm_single      # check config validity
 ```
 
 See `docs/experiments.md` for details on the experiment system.
+
+## Reproducibility
+
+A complete map from every table and figure in the paper to the script that
+produces it, the computing environments, data provenance, expected
+runtimes, and an explicit account of what is (and is not) exactly
+reproducible is given in [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 
 ## Citation
 
