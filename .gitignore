@@ -32,8 +32,12 @@ Thumbs.db
 # Logs
 *.log
 
-# Experiment outputs
-results/
+# Experiment outputs. The real-world benchmark data and the result artefacts
+# needed for the reproducibility check are shipped in-repo (see
+# REPRODUCIBILITY.md); everything else under data/ and results/ stays local.
+results/*
+!results/realworld/
+!results/r2/
 outputs/
 wandb/
 rebuttal/
@@ -41,7 +45,9 @@ rebuttal/
 # Jupyter
 .ipynb_checkpoints/
 
-data/
+data/*
+!data/battery/
+!data/cmapss/
 
 # Paper revisions and rebuttal letters (kept local, not part of the code release)
 /rebuttal\ /

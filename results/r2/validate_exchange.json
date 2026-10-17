@@ -1,0 +1,99 @@
+{
+  "results": {
+    "SN/exchange_rate_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 5,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 3.1,
+      "afm": {
+        "CRPS": 0.01074974784284811,
+        "ND": 0.01074974784284811
+      },
+      "tsflow": {
+        "CRPS": 0.010749747661672866,
+        "ND": 0.010749747661672868
+      }
+    },
+    "ETS/exchange_rate_nips/hist=2500": {
+      "spec": {
+        "model": "ets",
+        "m": 5,
+        "clip": false
+      },
+      "history": 2500,
+      "fit_seconds": 10.1,
+      "afm": {
+        "CRPS": 0.0075998196017996525,
+        "ND": 0.009203997528385823
+      },
+      "tsflow": {
+        "CRPS": 0.00788904063158707,
+        "ND": 0.00920399737326251
+      }
+    },
+    "ETS/exchange_rate_nips/hist=None": {
+      "spec": {
+        "model": "ets",
+        "m": 5,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 18.9,
+      "afm": {
+        "CRPS": 0.007724122220203174,
+        "ND": 0.009227081952936698
+      },
+      "tsflow": {
+        "CRPS": 0.008017636223717362,
+        "ND": 0.009227081797424324
+      }
+    },
+    "ARIMA/exchange_rate_nips/hist=2500": {
+      "spec": {
+        "model": "arima",
+        "m": 5,
+        "clip": false
+      },
+      "history": 2500,
+      "fit_seconds": 15.7,
+      "afm": {
+        "CRPS": 0.00765159097025125,
+        "ND": 0.009442344883124053
+      },
+      "tsflow": {
+        "CRPS": 0.007945012926177311,
+        "ND": 0.009442344723983658
+      }
+    },
+    "ARIMA/exchange_rate_nips/hist=None": {
+      "spec": {
+        "model": "arima",
+        "m": 5,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 37.8,
+      "afm": {
+        "CRPS": 0.007322126121726841,
+        "ND": 0.00944518703413571
+      },
+      "tsflow": {
+        "CRPS": 0.007614226855047738,
+        "ND": 0.009445186874947413
+      }
+    }
+  },
+  "versions": {
+    "python": "3.12.7",
+    "gluonts": "0.17.0",
+    "statsforecast": "2.1.1",
+    "utilsforecast": "0.2.16",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "machine": "arm64 10 cpus"
+  },
+  "timestamp": "2026-09-28 11:38:15"
+}

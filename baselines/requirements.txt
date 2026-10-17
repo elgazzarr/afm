@@ -1,0 +1,21 @@
+# Exact environment for the Table 4 statistical baselines
+# (baselines/r2_statistical_baselines.py, baselines/run_r2_dhr.sh)
+#
+# Recreate with:
+#   uv venv baselines/.venv --python 3.12
+#   uv pip install --python baselines/.venv/bin/python -r baselines/requirements.txt
+#
+# Frozen from the environment used to produce the published rows
+# (Apple M1 Pro, Python 3.12.7). The four packages below the marker are
+# what the script imports directly; the rest are their pinned transitive
+# dependencies recorded for completeness.
+gluonts==0.17.0
+statsforecast==2.1.1
+utilsforecast==0.2.16
+numpy==2.5.3
+# --- transitive dependencies (frozen) ---
+pandas==2.3.3
+pydantic==2.13.5
+toolz==0.12.1
+tqdm==4.70.1
+typing-extensions==4.16.0

@@ -1,0 +1,21 @@
+{
+  "dataset": "solar_nips",
+  "spec": {
+    "model": "mstl"
+  },
+  "history": 1344,
+  "n_cells": 10,
+  "seconds": 2.7,
+  "seconds_per_cell": 0.268,
+  "est_full_seconds": 257.0,
+  "versions": {
+    "python": "3.12.7",
+    "gluonts": "0.17.0",
+    "statsforecast": "2.1.1",
+    "utilsforecast": "0.2.16",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "machine": "arm64 10 cpus"
+  },
+  "timestamp": "2026-09-28 11:41:52"
+}

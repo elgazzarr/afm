@@ -1,0 +1,65 @@
+{
+  "results": {
+    "SN/electricity_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 24,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 5.8,
+      "afm": {
+        "CRPS": 0.0693002570998662,
+        "ND": 0.06930025709986622
+      },
+      "tsflow": {
+        "CRPS": 0.06930025721115612,
+        "ND": 0.06930025721115614
+      }
+    },
+    "SN/solar_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 24,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 4.3,
+      "afm": {
+        "CRPS": 0.5120932710079721,
+        "ND": 0.5120932710079721
+      },
+      "tsflow": {
+        "CRPS": 0.5120932723426989,
+        "ND": 0.5120932723426989
+      }
+    },
+    "SN/traffic_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 24,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 9.3,
+      "afm": {
+        "CRPS": 0.2209416073707617,
+        "ND": 0.2209416073707617
+      },
+      "tsflow": {
+        "CRPS": 0.22094160735043275,
+        "ND": 0.22094160735043272
+      }
+    }
+  },
+  "versions": {
+    "python": "3.12.7",
+    "gluonts": "0.17.0",
+    "statsforecast": "2.1.1",
+    "utilsforecast": "0.2.16",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "machine": "arm64 10 cpus"
+  },
+  "timestamp": "2026-09-28 11:40:50"
+}

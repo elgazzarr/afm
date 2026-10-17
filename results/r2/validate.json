@@ -1,0 +1,150 @@
+{
+  "results": {
+    "SN/exchange_rate_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 30,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 4.7,
+      "afm": {
+        "CRPS": 0.012959945507545758,
+        "ND": 0.012959945507545758
+      },
+      "tsflow": {
+        "CRPS": 0.012959945289120053,
+        "ND": 0.012959945289120053
+      }
+    },
+    "ETS/exchange_rate_nips/hist=2500": {
+      "spec": {
+        "model": "ets",
+        "m": 5,
+        "clip": false
+      },
+      "history": 2500,
+      "fit_seconds": 15.3,
+      "afm": {
+        "CRPS": 0.0075998196017996525,
+        "ND": 0.009203997528385823
+      },
+      "tsflow": {
+        "CRPS": 0.00788904063158707,
+        "ND": 0.00920399737326251
+      }
+    },
+    "ETS/exchange_rate_nips/hist=None": {
+      "spec": {
+        "model": "ets",
+        "m": 5,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 34.6,
+      "afm": {
+        "CRPS": 0.007724122220203174,
+        "ND": 0.009227081952936698
+      },
+      "tsflow": {
+        "CRPS": 0.008017636223717362,
+        "ND": 0.009227081797424324
+      }
+    },
+    "ARIMA/exchange_rate_nips/hist=2500": {
+      "spec": {
+        "model": "arima",
+        "m": 5,
+        "clip": false
+      },
+      "history": 2500,
+      "fit_seconds": 28.1,
+      "afm": {
+        "CRPS": 0.00765159097025125,
+        "ND": 0.009442344883124053
+      },
+      "tsflow": {
+        "CRPS": 0.007945012926177311,
+        "ND": 0.009442344723983658
+      }
+    },
+    "ARIMA/exchange_rate_nips/hist=None": {
+      "spec": {
+        "model": "arima",
+        "m": 5,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 54.7,
+      "afm": {
+        "CRPS": 0.007322126121726841,
+        "ND": 0.00944518703413571
+      },
+      "tsflow": {
+        "CRPS": 0.007614226855047738,
+        "ND": 0.009445186874947413
+      }
+    },
+    "SN/electricity_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 24,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 8.2,
+      "afm": {
+        "CRPS": 0.0693002570998662,
+        "ND": 0.06930025709986622
+      },
+      "tsflow": {
+        "CRPS": 0.06930025721115612,
+        "ND": 0.06930025721115614
+      }
+    },
+    "SN/solar_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 24,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 5.5,
+      "afm": {
+        "CRPS": 0.5120932710079721,
+        "ND": 0.5120932710079721
+      },
+      "tsflow": {
+        "CRPS": 0.5120932723426989,
+        "ND": 0.5120932723426989
+      }
+    },
+    "SN/traffic_nips": {
+      "spec": {
+        "model": "sn",
+        "m": 24,
+        "clip": false
+      },
+      "history": null,
+      "fit_seconds": 16.1,
+      "afm": {
+        "CRPS": 0.2209416073707617,
+        "ND": 0.2209416073707617
+      },
+      "tsflow": {
+        "CRPS": 0.22094160735043275,
+        "ND": 0.22094160735043272
+      }
+    }
+  },
+  "versions": {
+    "python": "3.12.7",
+    "gluonts": "0.17.0",
+    "statsforecast": "2.1.1",
+    "utilsforecast": "0.2.16",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "machine": "arm64 10 cpus"
+  },
+  "timestamp": "2026-10-16 15:46:58"
+}

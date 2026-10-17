@@ -1,0 +1,23 @@
+{
+  "dataset": "electricity_nips",
+  "spec": {
+    "model": "dhr",
+    "k1": 10,
+    "k2": 10
+  },
+  "history": 1344,
+  "n_cells": 10,
+  "seconds": 16.0,
+  "seconds_per_cell": 1.595,
+  "est_full_seconds": 4131.0,
+  "versions": {
+    "python": "3.12.7",
+    "gluonts": "0.17.0",
+    "statsforecast": "2.1.1",
+    "utilsforecast": "0.2.16",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "machine": "arm64 10 cpus"
+  },
+  "timestamp": "2026-09-28 11:43:08"
+}

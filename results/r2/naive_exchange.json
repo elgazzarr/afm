@@ -1,0 +1,44 @@
+{
+  "results": {
+    "hist=None": {
+      "spec": {
+        "model": "naive"
+      },
+      "history": null,
+      "fit_seconds": 2.8,
+      "afm": {
+        "CRPS": 0.007444115347707576,
+        "ND": 0.009310972242627008
+      },
+      "tsflow": {
+        "CRPS": 0.007732853645466466,
+        "ND": 0.009310972085700756
+      }
+    },
+    "hist=2500": {
+      "spec": {
+        "model": "naive"
+      },
+      "history": 2500,
+      "fit_seconds": 2.5,
+      "afm": {
+        "CRPS": 0.007828992194777059,
+        "ND": 0.009310972242627008
+      },
+      "tsflow": {
+        "CRPS": 0.008125064254333706,
+        "ND": 0.009310972085700756
+      }
+    }
+  },
+  "versions": {
+    "python": "3.12.7",
+    "gluonts": "0.17.0",
+    "statsforecast": "2.1.1",
+    "utilsforecast": "0.2.16",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "machine": "arm64 10 cpus"
+  },
+  "timestamp": "2026-09-28 11:41:19"
+}
