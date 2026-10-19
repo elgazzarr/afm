@@ -67,8 +67,7 @@ afm/
 Two separate environments are used. All commands below assume the repository
 root as working directory.
 
-### 4.1 Main environment (library, synthetic experiments, real-world
-degradation studies, GluonTS pipeline)
+### 4.1 Main environment (library, synthetic experiments, real-world degradation studies, GluonTS pipeline)
 
 Python **3.12.7** with the pins in `pyproject.toml`. Exact versions used for
 everything documented in this README:
@@ -169,14 +168,14 @@ real-world numbers by evaluation only:
 | `results/r2/*.json` (Naive/MSTL/DHR results + timings + harness validation) | `baselines/r2_statistical_baselines.py`, `baselines/run_r2_dhr.sh` | Table 4 rows marked † |
 
 Deleting `results/realworld/models/` forces full retraining instead
-(≈3 min/seed on CPU for these datasets; see §8).
+(runtimes in §8).
 
 ## 7. Which code produces which output
 
 | Paper output | Script(s) | Command | Reproducibility |
 |---|---|---|---|
 | Table 1 (system specs) | `src/afm/systems/systems.py` | (specification table; systems listed in `README.md`) | documentation |
-| Table 2 (AFM vs FM, 5 synthetic systems) | `src/afm/experiments/` via bundled configs | `afm run afm_vs_fm_single --system <name>` (one run per system; see §11.1 for the paper's data size) | statistical (§11) |
+| Table 2 (AFM vs FM, 5 synthetic systems) | `src/afm/experiments/` via bundled configs | `afm run afm_vs_fm_single --system <name>` (one run per system; see §11, item 1, for the paper's data size) | statistical (§11) |
 | Fig. 2 (example forecasts) | `afm run afm_vs_fm_single` (produces the same type of trajectory plots); the published composite's legend labels were set with `examples/r2_fig2_relabel.py` | as for Table 2 | statistical (§11) |
 | Table 3 (dataset properties) | GluonTS metadata | (properties listed from `get_dataset(...).metadata`) | documentation |
 | Table 4 — AFM row | `src/afm/gluonts_pipeline/` | `python -m afm.gluonts_pipeline.run --dataset_name <ds> [...]` | statistical (§11) |
@@ -203,7 +202,9 @@ baselines/.venv/bin/python baselines/r2_statistical_baselines.py validate
 baselines/.venv/bin/python baselines/r2_statistical_baselines.py naive
 
 # MSTL-ETS on the hourly datasets
-baselines/.venv/bin/python baselines/r2_statistical_baselines.py run --model mstl --dataset electricity_nips   # also solar_nips, traffic_nips
+# (repeat with --dataset solar_nips and --dataset traffic_nips)
+baselines/.venv/bin/python baselines/r2_statistical_baselines.py run \
+    --model mstl --dataset electricity_nips
 
 # DHR-ARIMA: choose (K1, K2) by AICc, then run
 bash baselines/run_r2_dhr.sh
@@ -219,10 +220,12 @@ published table.
 
 ```bash
 # C-MAPSS FD001 (ctx=20, H=108, 3 seeds) — skips training, checkpoints exist
-python examples/realworld_multiseed.py --dataset cmapss --subset FD001 --ctx 20 --seeds 3 --epochs 50
+python examples/realworld_multiseed.py --dataset cmapss --subset FD001 \
+    --ctx 20 --seeds 3 --epochs 50
 
 # Battery B0007 (ctx=66, H=66, leave-one-battery-out, 3 seeds)
-python examples/realworld_multiseed.py --dataset battery --holdout B0007 --ctx 66 --seeds 3 --epochs 50
+python examples/realworld_multiseed.py --dataset battery --holdout B0007 \
+    --ctx 66 --seeds 3 --epochs 50
 
 # regenerate all appendix figures + LaTeX tables from the artefacts
 python examples/make_appendix.py --in-dir results/realworld
